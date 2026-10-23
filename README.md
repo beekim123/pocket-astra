@@ -20,7 +20,7 @@
 
 群岛的航道被大雾吞没。岛民称为「鸣兽」的小生灵，仍然记得灯塔过去的旋律。你在醒潮港 Wakeharbor 结识守灯人 Edda，从三位伙伴中选择一位，前往烛苇原 Candle Reed Meadow，最后和道馆守灯人 Soren 一起唤醒回声。
 
-这是一个完整、紧凑的第一章，不包含后续岛屿或多道馆战役。预计首次体验约 15–25 分钟，熟悉路线后可更快完成。
+这是一个完整、紧凑的第一章；通关后可继续浅鸣潮池与雨阶岛的支线。第一章预计首次体验约 15–25 分钟，熟悉路线后可更快完成；当前尚未包含第二道馆战役。
 
 1. 标题选择 **Begin a New Journey**，阅读 Edda 的介绍，选择初始伙伴。
 2. 沿石路向右走，穿过木桥。离开石路，进入东岸苇草区触发遭遇。
@@ -40,6 +40,16 @@
 - 潮池西侧海草中可遇见帆溪獭、卵石甲、愿灯蛾，等级 2–4；第一次捕捉仍沿用愿灯蛾 Lv3 的教学规则。安全石路和交互点不会触发潮池遭遇。
 - 行囊的地图页可切换「岛屿地图 / 潮池地图」，显示救援点、三个观察点、玩家位置和返港方向。
 - 旧版存档可直接继续，新增支线默认未完成。支线不增加第一道馆的前置条件，不影响原有通关路线。
+
+## 雨阶通航与水路修复（1.3 / 第 03A 轮）
+
+点亮第一盏灯后，在醒潮港西侧石路尽头找到渡船人 **维恩 / Venn**。按 E 交谈，再选择「登船」前往雨阶岛；「留在这里」或 Esc 可取消。雨阶码头的维恩随时提供免费返航，岛上不用道具也能回家。
+
+**奥菈 / Orla** 在雨阶码头西侧提供免费休息和补给。沿中央石路与木桥寻找「屋檐引水口、桥边接水槽、菜圃出水口」，任意顺序交互修复三处水路，随后向奥菈报告。每段水渠会从静止暗水变为流动蓝水，并点亮标记；完工补给只领取一次。
+
+- 存档记录当前岛屿和水路进度，旧档自动视为仍在醒潮港。雨阶战败在当地码头回复，不会把角色放回错误岛屿。
+- 地图页增加雨阶地图，标出渡船、奥菈和三处水路。当地花草可遇见已有的帆溪獭、苔铃鹿、苇锋鹭、霆风鳐与夜辉鸮，等级 5–7。
+- 本轮完成双向渡船、新村落及完整修复支线。雨阶三种新物种属于下一轮 03B，第二道馆仍未实施。
 
 ## 原创鸣兽
 
@@ -102,6 +112,8 @@ scripts/
   world.gd              # 3D 岛屿、建筑、水、碰撞、摄影机、战斗场
   tidepool_world.gd      # 程序化潮池、共鸣标记与救援视觉
   tide_quest.gd          # 可选救援、记录与一次性奖励
+  rainstep_world.gd      # 雨阶村落、水渠、渡船与当地碰撞
+  rain_quest.gd          # 航渡门槛、免费回复与任意顺序修复
   encounter_tables.gd   # 原苇草/潮池的稳定地区遭遇表
   game_ui.gd            # 全代码界面、地图、队伍、图鉴
   art.gd                # 80×80 鸣兽、32×48 人物、材质与叶簇
@@ -126,10 +138,16 @@ tests/
   test_tide_rules.gd    # 潮池规则、任意顺序、旧档和奖励幂等
   test_tide_journey.gd  # 实际步行、救援、地图与重载
   test_tide_localization.gd # 新剧情各分支中英覆盖
+  test_rain_rules.gd    # 双向渡船、修复顺序、当地恢复和坏档边界
+  test_rain_journey.gd  # 中英实际航渡/步行/战败/修复/返航
+  test_rain_localization.gd # 雨阶完整对白与动态数值
+  capture_game.gd      # 截图专用协调器，禁用冒险保存
+  test_capture_isolation.gd # 验证截图不改变存档或语言偏好
   render_capture.gd    # 实际 GPU 渲染取证，输出至外部路径
   test_live_shutdown.gd # 实际图形/音频设备启动与正常关闭
 tools/
   verify.sh            # 串行验证，日志出现错误也判失败
+  prepare_validation.py # 创建独立项目及用户数据命名空间
   package.py           # 源码白名单打包与 SHA256
 docs/
   design/lanternwake.md
@@ -152,22 +170,25 @@ sh tools/verify.sh
 GODOT_BIN=/absolute/path/to/godot sh tools/verify.sh
 ```
 
-该脚本逐个执行导入、规则、主线、素材、音频和启动测试，不并发。请遵守本机所有 Codex 会话共享最多两个计算 worker 的限制；已经有两个计算任务时先等待。
+该脚本先用 Python 3 标准库创建一次性项目副本，将 `user://` 定向到独立的 `LanternwakeValidation/<唯一编号>`，再逐个执行导入、规则、主线/支线、素材、音频和启动测试，不并发。验证不在玩家的 `Lanternwake` 存档命名空间运行。请遵守本机所有 Codex 会话共享最多两个计算 worker 的限制；已经有两个计算任务时先等待。
 
 实际渲染截图（需要可用图形环境，输出不进入项目资源）：
 
 ```sh
-./Godot.app/Contents/MacOS/Godot --path . --audio-driver Dummy \
+validation_project=$(python3 tools/prepare_validation.py)
+./Godot.app/Contents/MacOS/Godot --headless --path "$validation_project" --editor --import --quit
+./Godot.app/Contents/MacOS/Godot --path "$validation_project" --audio-driver Dummy \
   --script tests/render_capture.gd -- world /tmp/lanternwake-world.png
 ```
 
-视图参数还支持 `title`、`starter`、`meadow`、`battle`、`journal`、`ending`、`tidepools`、`shore_map`、`rescue`、`shore_battle`。输出路径之后可加 `en` 检查英文。
+视图参数还支持 `title`、`starter`、`meadow`、`battle`、`journal`、`ending`、`tidepools`、`shore_map`、`rescue`、`shore_battle`、`rainstep`、`rain_map`、`rain_repair`、`ferry`、`rain_battle`。输出路径之后可加 `en` 检查英文。截图协调器另行禁用保存，形成第二层隔离。
 
 ## 已知范围与下一阶段
 
-- 当前交付是完整第一章、浅鸣潮池支线与简体中文/英文切换；第二座道馆、进化、联网和配音尚未实施。
+- 当前交付是完整第一章、浅鸣潮池支线、雨阶通航与水路修复，以及简体中文/英文切换；第二座道馆、进化、联网和配音尚未实施。
 - 全代码美术偏向手工像素和微缩布景，未追求所参考商业作品的美术规模与电影级光照。
 - 技术验证详情以 `docs/v2/status.md` 为准；自动通关与画面检查不等于用户亲自验收，也不是长时间稳定性或所有硬件的兼容性保证。
-- 已获授权继续扩展，下一轮计划为雨阶岛的双向渡船和地区内容，再增加新鸣兽与第二道馆。每轮保持已有旅程可玩，验证后独立提交推送。
+- 旧版截图脚本的互动场景曾走真实保存入口，有覆盖默认冒险档的风险。1.3 已改为无保存截图协调器，并让整个验证流程使用独立用户目录。没有历史备份，无法确认或自动恢复此前可能受影响的进度；本轮隔离后现有存档已核对保持字节一致。
+- 已获授权继续扩展，下一轮计划追加雨阶三种原创鸣兽和图鉴分页，再推进第二道馆。每轮保持已有旅程可玩，验证后独立提交推送。
 
 项目内新创作的游戏内容、角色、地名、对白、旋律和图形均为本次原创；不使用参考作品的名称、形象、地图或音乐。Godot 引擎原有程序属于用户提供的开发工具，不属于游戏素材，也不包含在交付 ZIP 中。

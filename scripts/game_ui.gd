@@ -5,6 +5,7 @@ const Art = preload("res://scripts/art.gd")
 const DB = preload("res://scripts/creature_db.gd")
 const Locale = preload("res://scripts/localization.gd")
 const ShoreQuest = preload("res://scripts/tide_quest.gd")
+const RainStory = preload("res://scripts/rain_quest.gd")
 const INK := Color("142b34")
 const PANEL := Color(0.045, 0.10, 0.14, 0.96)
 const CREAM := Color("f1e4c5")
@@ -36,6 +37,9 @@ func _draw() -> void:
 			_dialogue()
 		"battle": _battle()
 		"menu": _menu()
+		"ferry":
+			_exploration(false)
+			_ferry_dialogue()
 		"ending": _ending()
 	if game.toast_time > 0:
 		var w: float = minf(1180, F.width(game.toast, 2) + 44)
@@ -158,7 +162,8 @@ func _exploration(show_controls: bool = true) -> void:
 	_text(game.world.area_name(), Vector2(46, 55), 2)
 	_panel(Rect2(790, 24, 462, 92), MIST, 0.91)
 	_text("YOUR NEXT STEP", Vector2(811, 39), 1, GOLD)
-	_paragraph(game.state.quest(), Vector2(811, 59), 35, 2, CREAM, 7)
+	var objective: String = RainStory.objective(game.state) if bool(game.state.flags.gym) else game.state.quest()
+	_paragraph(objective, Vector2(811, 59), 35, 2, CREAM, 7)
 	for i in range(game.state.party.size()):
 		var c: Dictionary = game.state.party[i]
 		var x: float = 32 + i * 51
@@ -169,8 +174,12 @@ func _exploration(show_controls: bool = true) -> void:
 	if show_controls:
 		if bool(game.state.flags.starter):
 			_panel(Rect2(28, 562, 338, 82), TEAL, 0.90)
-			_text("OPTIONAL SHORE JOURNEY", Vector2(45, 575), 1, TEAL)
-			_paragraph(ShoreQuest.objective(game.state), Vector2(45, 599), 48, 1, CREAM, 6)
+			if game.world.island_id == "rainstep":
+				_text("RAINSTEP WATERWORKS", Vector2(45, 575), 1, TEAL)
+				_text("WATER CHANNELS %d / 3" % RainStory.repaired_count(game.state), Vector2(45, 599), 1, CREAM)
+			else:
+				_text("OPTIONAL SHORE JOURNEY", Vector2(45, 575), 1, TEAL)
+				_paragraph(ShoreQuest.objective(game.state), Vector2(45, 599), 48, 1, CREAM, 6)
 		_panel(Rect2(28, 658, 1224, 37), MIST, 0.85)
 		_text("WASD / MOVE    SHIFT / RUN    E / TALK    TAB / SATCHEL    J / JOURNAL    F5 / SAVE", Vector2(45, 672), 1, CREAM)
 		_text("VESSELS %02d  TONICS %02d" % [game.state.orbs, game.state.tonics], Vector2(956, 672), 1, GOLD)
@@ -190,6 +199,14 @@ func _dialogue() -> void:
 		_paragraph(game.dialogue[0], Vector2(78, 577), 88, 2, CREAM, 10)
 	_button("next", "E / CONTINUE", Rect2(1044, 649, 160, 26), 1)
 
+func _ferry_dialogue() -> void:
+	draw_rect(Rect2(0, 0, 1280, 720), Color(0.02, 0.07, 0.10, 0.42))
+	_panel(Rect2(320, 221, 640, 292), GOLD)
+	_center("FERRY TO RAINSTEP" if game.ferry_destination == "rainstep" else "FERRY TO WAKEHARBOR", Vector2(640, 257), 3, CREAM)
+	_paragraph("Follow the dry paths. Orla offers free rest by the landing, and Venn can always take you home.", Vector2(360, 321), 45, 2, MIST)
+	_button("ferry_board", "BOARD FERRY", Rect2(360, 435, 260, 43), 2)
+	_button("ferry_cancel", "STAY HERE", Rect2(640, 435, 280, 43), 2)
+
 func _health(creature: Dictionary, pos: Vector2, enemy_side: bool = false) -> void:
 	var info: Dictionary = DB.species(int(creature.id))
 	_panel(Rect2(pos, Vector2(360, 104)), info.color)
@@ -205,7 +222,7 @@ func _health(creature: Dictionary, pos: Vector2, enemy_side: bool = false) -> vo
 
 func _battle() -> void:
 	draw_rect(Rect2(0, 0, 1280, 8), INK)
-	var wild_heading: String = "A SONG IN THE TIDEPOOLS" if game.battle_region == "tidepools" else "A SONG IN THE REEDS"
+	var wild_heading: String = "A SONG IN THE TIDEPOOLS" if game.battle_region == "tidepools" else ("A SONG IN THE RAIN" if game.battle_region == "rainstep" else "A SONG IN THE REEDS")
 	_text("FIRST LIGHT TRIAL" if game.battle.kind == "gym" else ("IVO / BRIDGE CHALLENGE" if game.battle.kind == "trainer" else wild_heading), Vector2(42, 37), 2, CREAM)
 	_text("TURN %02d   /   %s" % [game.battle.turn + 1, str(game.battle.kind).to_upper()], Vector2(43, 64), 1, GOLD)
 	_health(game.battle.enemy, Vector2(856, 34), true)
@@ -313,6 +330,11 @@ func _journal_menu() -> void:
 func _map_menu() -> void:
 	_button("map_island", "ISLAND MAP", Rect2(74, 151, 155, 22), 1)
 	_button("map_shore", "SHORE MAP", Rect2(238, 151, 155, 22), 1)
+	if bool(game.state.flags.gym):
+		_button("map_rain", "RAINSTEP MAP", Rect2(402, 151, 155, 22), 1)
+	if game.map_rain:
+		_rain_map()
+		return
 	if game.map_shore:
 		_shore_map()
 		return
@@ -336,10 +358,11 @@ func _map_menu() -> void:
 	_text("IVO", Vector2(476, 420), 1, CREAM)
 	var p: Vector3 = game.world.player_position
 	var marker := Vector2(414 + p.x * 21, 389 + p.z * 17)
-	if game.world.area_id() != "tidepools":
+	if game.world.island_id == "wakeharbor" and game.world.area_id() != "tidepools":
 		draw_circle(marker, 7, GOLD)
 		draw_arc(marker, 12 + sin(game.clock * 3) * 2, 0, TAU, 24, CREAM, 1)
 	_text("CAUSEWAY / SOUTH", Vector2(118, 580), 1, GOLD)
+	_text("WESTERN PIER", Vector2(92, 469), 1, GOLD)
 	_text("YOUR JOURNEY", Vector2(800, 184), 2, GOLD)
 	var milestones := ["CHOOSE A COMPANION", "CATCH A WILD RESONANT", "DEFEAT IVO", "WIN THE FIRST LIGHT"]
 	var keys := ["starter", "captured", "rival", "gym"]
@@ -388,6 +411,47 @@ func _shore_map() -> void:
 		_text("%d" % (i + 1), Vector2(827, y), 1, GOLD)
 		_text(names[i], Vector2(849, y), 1, CREAM)
 	_paragraph("Follow the dry eastern bank to Wispip. The three markers can be heard in any order.", Vector2(800, 527), 32, 2, MIST)
+
+func _rain_point(point: Vector2) -> Vector2:
+	return Vector2(100 + (point.x - 48) * 25, 200 + (point.y + 11) * 17.5)
+
+func _rain_map() -> void:
+	draw_rect(Rect2(74, 178, 681, 435), Color("253a50"))
+	draw_rect(Rect2(100, 200, 600, 385), Color("81949c"))
+	draw_rect(Rect2(_rain_point(Vector2(59.1, -8.4)), Vector2(45, 315)), Color("c4bd9e"))
+	for z in [-6.5, -1.5, 3.8]:
+		draw_rect(Rect2(_rain_point(Vector2(50, z - 0.45)), Vector2(500, 16)), Color("c4bd9e"))
+	for house in game.world.rainstep.obstacles:
+		var rect := Rect2(_rain_point(house.position), house.size * Vector2(25, 17.5))
+		draw_rect(rect, Color("56667b"))
+	var positions: Array[Vector2] = [Vector2(52, -6.5), Vector2(67, -1.5), Vector2(52, 3.8)]
+	var keys: Array[String] = ["rain_upper", "rain_middle", "rain_lower"]
+	for i in range(3):
+		var p: Vector2 = _rain_point(positions[i])
+		draw_circle(p, 10, TEAL if game.state.flags.get(keys[i], false) else INK)
+		_center(str(i + 1), p - Vector2(0, 4), 1, CREAM)
+	var dock := _rain_point(Vector2(60, 9.4))
+	draw_circle(dock, 7, GOLD)
+	_center("FERRY TO WAKEHARBOR", dock - Vector2(0, 25), 1, INK)
+	var keeper := _rain_point(Vector2(56, 5.5))
+	draw_circle(keeper, 5, TEAL)
+	_text("ORLA", keeper + Vector2(12, -4), 1, INK)
+	if game.world.island_id == "rainstep":
+		var p: Vector3 = game.world.player_position
+		var marker := _rain_point(Vector2(p.x, p.z))
+		draw_circle(marker, 5, CREAM)
+		draw_arc(marker, 12, 0, TAU, 32, GOLD, 1)
+	_text("RAINSTEP TERRACES", Vector2(106, 592), 1, CREAM)
+	_text("RAINSTEP WATERWORKS", Vector2(800, 184), 2, GOLD)
+	_paragraph(RainStory.objective(game.state), Vector2(800, 228), 32, 2, CREAM)
+	_text("WATER CHANNELS %d / 3" % RainStory.repaired_count(game.state), Vector2(800, 332), 2, TEAL)
+	var names: Array[String] = ["ROOF INTAKE", "BRIDGE JUNCTION", "GARDEN OUTLET"]
+	for i in range(3):
+		var y: float = 376 + i * 43
+		draw_circle(Vector2(810, y + 6), 5, TEAL if game.state.flags.get(keys[i], false) else MIST)
+		_text(str(i + 1), Vector2(827, y), 1, GOLD)
+		_text(names[i], Vector2(849, y), 1, CREAM)
+	_paragraph("Three channels carry roof water to the gardens. Repair them in any order, then return to Orla.", Vector2(800, 527), 32, 2, MIST)
 
 func _settings_menu() -> void:
 	_text("A COMFORTABLE JOURNEY", Vector2(82, 185), 2, GOLD)

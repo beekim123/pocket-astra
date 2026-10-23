@@ -4,13 +4,22 @@ cd "$(dirname "$0")/.."
 if [ -n "${GODOT_BIN:-}" ]; then
     engine="$GODOT_BIN"
 elif [ -x ./Godot.app/Contents/MacOS/Godot ]; then
-    engine=./Godot.app/Contents/MacOS/Godot
+    engine="$PWD/Godot.app/Contents/MacOS/Godot"
 elif command -v godot >/dev/null 2>&1; then
     engine=godot
 else
     echo 'Set GODOT_BIN to your Godot 4.7.2 executable.' >&2
     exit 1
 fi
+# Never execute fixtures in the player's user-data namespace.
+case "$engine" in
+    /*) ;;
+    */*) engine="$(python3 -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve())' "$engine")" ;;
+    *) engine="$(command -v "$engine")" ;;
+esac
+validation_root="$(python3 tools/prepare_validation.py)"
+cd "$validation_root"
+echo "Isolated validation project: $validation_root"
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
 log_dir="${TMPDIR:-/tmp}/lanternwake-verification-$$"
 mkdir -p "$log_dir"
@@ -41,5 +50,10 @@ run_check tide_rules --script tests/test_tide_rules.gd
 run_check tide_journey --script tests/test_tide_journey.gd
 run_check tide_journey_english --script tests/test_tide_journey.gd -- en
 run_check tide_localization --script tests/test_tide_localization.gd
+run_check rain_rules --script tests/test_rain_rules.gd
+run_check rain_journey --script tests/test_rain_journey.gd
+run_check rain_journey_english --script tests/test_rain_journey.gd -- en
+run_check rain_localization --script tests/test_rain_localization.gd
+run_check capture_isolation --script tests/test_capture_isolation.gd
 run_check startup --quit-after 30
 echo "All sequential checks passed. Logs: $log_dir"

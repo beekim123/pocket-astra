@@ -4,15 +4,21 @@ extends Node3D
 
 const Art = preload("res://scripts/art.gd")
 const Tidepool = preload("res://scripts/tidepool_world.gd")
+const Rainstep = preload("res://scripts/rainstep_world.gd")
 const TIDE_CAUSEWAY: Rect2 = Tidepool.CAUSEWAY
 const TIDE_BOUNDS: Rect2 = Tidepool.BOUNDS
 const TIDE_POOLS: Array[Rect2] = Tidepool.POOLS
 const TIDE_REEDS: Rect2 = Tidepool.REEDS
+const RAIN_BOUNDS: Rect2 = Rainstep.BOUNDS
+const RAIN_DOCK: Vector3 = Rainstep.DOCK
+const HOME_DOCK := Vector3(-13, 0, 4.1)
+const RAIN_PATCH: Rect2 = Rainstep.PATCHES[0]
 const SHORE_MARGIN: float = 0.18
 var camera: Camera3D
 var player: Sprite3D
 var companion: Sprite3D
 var player_position := Vector3(-7, 0, 5)
+var island_id: String = "wakeharbor"
 var direction: int = 0
 var moving: bool = false
 var in_battle: bool = false
@@ -29,9 +35,11 @@ var battle_ids := Vector2i(0, 3)
 var battle_pulse: float = 0.0
 var stage: Node3D
 var tidepools: Tidepool
+var rainstep: Rainstep
 var battle_biome: String = "meadow"
 var _stage_surfaces: Array[Dictionary] = []
 var _shore_stage_props: Node3D
+var _rain_stage_props: Node3D
 var _materials: Dictionary = {}
 var _rng := RandomNumberGenerator.new()
 var _last_frame: int = -1
@@ -46,6 +54,9 @@ func _ready() -> void:
 	_build_meadow()
 	tidepools = Tidepool.new()
 	tidepools.build(self)
+	rainstep = Rainstep.new()
+	rainstep.build(self)
+	rainstep.root_node.visible = false
 	_build_stage()
 	player = _person("player", player_position)
 	companion = _sprite(Art.creature(0), player_position + Vector3(0.8, 0.55, 0.6), 0.017)
@@ -410,6 +421,16 @@ func _build_stage() -> void:
 		for z in [-1.1, 1.0]:
 			_box(Vector3(x, 0.35, z), Vector3(0.15, 0.60, 0.15), Color("d7ba78"), "", _shore_stage_props)
 	_shore_stage_props.visible = false
+	_rain_stage_props = Node3D.new()
+	_rain_stage_props.name = "RainstepWetWood"
+	stage.add_child(_rain_stage_props)
+	for x in [-7.0, 7.0]:
+		for i in range(6):
+			_box(Vector3(x, 0.17, -1.35 + i * 0.5), Vector3(1.3, 0.20, 0.43), Color("66768a"), "wood", _rain_stage_props)
+		for z in [-1.5, 1.45]:
+			_box(Vector3(x, 0.47, z), Vector3(1.5, 0.12, 0.12), Color("af997f"), "wood", _rain_stage_props)
+		_box(Vector3(x, 0.30, 0), Vector3(0.16, 0.08, 2.8), Color("87cbd7"), "", _rain_stage_props)
+	_rain_stage_props.visible = false
 	for i in range(8):
 		var p := Vector3(-7.5 + i * 2.1, 0.0, 49.0 - absf(3.5 - i) * 0.18)
 		_tree(p, 0.8, false)
@@ -419,9 +440,36 @@ func _build_stage() -> void:
 	battle_enemy.visible = false
 
 func _stage_surface(node: MeshInstance3D, shore_color: Color, texture_kind: String = "") -> void:
-	_stage_surfaces.append({"node":node, "meadow":node.material_override, "tidepools":_mat(shore_color, texture_kind)})
+	var rain_color: Color = shore_color.lerp(Color("777ba2"), 0.52)
+	_stage_surfaces.append({"node":node, "meadow":node.material_override, "tidepools":_mat(shore_color, texture_kind), "rainstep":_mat(rain_color, texture_kind)})
+
+func set_island(id: String, spawn: Vector3) -> void:
+	island_id = id if id in ["wakeharbor", "rainstep"] else "wakeharbor"
+	var arrival := Vector3(spawn.x, 0, spawn.z)
+	player_position = arrival if spawn.is_finite() and can_walk(arrival) else (RAIN_DOCK if island_id == "rainstep" else HOME_DOCK)
+	moving = false
+	if is_instance_valid(player):
+		player.position = player_position + Vector3(0, 0.81, 0)
+	if is_instance_valid(companion):
+		companion.position = player_position + Vector3(0.65, 0.6, 0.65)
+	if rainstep != null:
+		rainstep.root_node.visible = island_id == "rainstep"
+	_camera_target = _overworld_camera_target()
+	if is_instance_valid(camera):
+		camera.position = _camera_target + Vector3(0, 17, 20)
+		camera.look_at(_camera_target)
+
+func _overworld_camera_target() -> Vector3:
+	if island_id == "rainstep":
+		return Vector3(clampf(player_position.x, 53, 67), 0, clampf(player_position.z, -7, 7))
+	var south_limit: float = 21.0 if area_id() == "tidepools" else 6.0
+	return Vector3(clampf(player_position.x, -9, 9), 0, clampf(player_position.z, -6, south_limit))
 
 func can_walk(pos: Vector3) -> bool:
+	if not pos.is_finite():
+		return false
+	if island_id == "rainstep":
+		return rainstep != null and rainstep.can_walk(pos)
 	var point := Vector2(pos.x, pos.z)
 	var original_island: bool = absf(pos.x) <= 14.5 and absf(pos.z) <= 10.6
 	var tide_shore: bool = TIDE_CAUSEWAY.grow(-SHORE_MARGIN).has_point(point) or TIDE_BOUNDS.grow(-SHORE_MARGIN).has_point(point)
@@ -457,6 +505,8 @@ func nearby() -> Dictionary:
 	var nearest: Dictionary = {}
 	var distance: float = 1.7
 	for npc in npcs:
+		if String(npc.get("island", "wakeharbor")) != island_id:
+			continue
 		if not bool(npc.get("active", true)):
 			continue
 		var d: float = player_position.distance_to(npc.pos)
@@ -469,6 +519,8 @@ func is_grass() -> bool:
 	return encounter_region() != ""
 
 func encounter_region() -> String:
+	if island_id == "rainstep":
+		return "rainstep" if Rainstep.is_encounter_point(player_position) else ""
 	if Tidepool.is_encounter_point(player_position):
 		return "tidepools"
 	if player_position.x > 3.6 and player_position.z > -1.8 and player_position.z < 8.5 and absf(player_position.z - 4.1) > 1.12 and absf(player_position.x - 9) > 1.3:
@@ -476,6 +528,8 @@ func encounter_region() -> String:
 	return ""
 
 func area_id() -> String:
+	if island_id == "rainstep":
+		return "rainstep"
 	var point := Vector2(player_position.x, player_position.z)
 	if TIDE_BOUNDS.has_point(point) or (player_position.z > 10.6 and TIDE_CAUSEWAY.has_point(point)):
 		return "tidepools"
@@ -490,18 +544,23 @@ func area_name() -> String:
 		"village": return "WAKEHARBOR"
 		"sanctum": return "FIRST LIGHT SANCTUM"
 		"tidepools": return "TIDEGLASS POOLS"
+		"rainstep": return "RAINSTEP TERRACES"
 	return "CANDLE REED MEADOW"
 
 func sync_tide_progress(flags: Dictionary) -> void:
 	tidepools.sync_progress(flags)
 
+func sync_rain_progress(flags: Dictionary) -> void:
+	rainstep.sync_progress(flags)
+
 func set_battle(enabled: bool, player_id: int = 0, enemy_id: int = 3, biome: String = "meadow") -> void:
 	in_battle = enabled
-	battle_biome = "tidepools" if biome == "tidepools" else "meadow"
+	battle_biome = biome if biome in ["tidepools", "rainstep"] else "meadow"
 	for surface in _stage_surfaces:
 		var node: MeshInstance3D = surface.node
 		node.material_override = surface[battle_biome]
 	_shore_stage_props.visible = battle_biome == "tidepools"
+	_rain_stage_props.visible = battle_biome == "rainstep"
 	battle_ids = Vector2i(player_id, enemy_id)
 	battle_player.visible = enabled
 	battle_enemy.visible = enabled
@@ -510,7 +569,7 @@ func set_battle(enabled: bool, player_id: int = 0, enemy_id: int = 3, biome: Str
 		_camera_target = Vector3(0, 0, 55)
 		camera.size = 12.8
 	else:
-		_camera_target = player_position
+		_camera_target = _overworld_camera_target()
 		camera.size = 15.6
 	camera.position = _camera_target + (Vector3(0, 12, 22) if enabled else Vector3(0, 17, 20))
 	camera.look_at(_camera_target)
@@ -532,8 +591,7 @@ func _process(delta: float) -> void:
 	companion.visible = companion_id >= 0 and not in_battle
 	companion.position = companion.position.lerp(player_position + Vector3(0.65, 0.6 + sin(clock * 3) * 0.04, 0.65), minf(1, delta * 4))
 	if not in_battle:
-		var south_limit: float = 21.0 if area_id() == "tidepools" else 6.0
-		var target := Vector3(clampf(player_position.x, -9, 9), 0, clampf(player_position.z, -6, south_limit))
+		var target := _overworld_camera_target()
 		_camera_target = _camera_target.lerp(target, 1.0 - exp(-delta * 3.5))
 		camera.position = _camera_target + Vector3(0, 17, 20)
 		camera.look_at(_camera_target)

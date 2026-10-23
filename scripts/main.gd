@@ -11,6 +11,7 @@ const Locale = preload("res://scripts/localization.gd")
 const Preferences = preload("res://scripts/preferences.gd")
 const ShoreQuest = preload("res://scripts/tide_quest.gd")
 const Encounters = preload("res://scripts/encounter_tables.gd")
+const RainStory = preload("res://scripts/rain_quest.gd")
 
 var state: GameState = State.new()
 var world: LanternWorld
@@ -21,6 +22,8 @@ var mode: String = "title"
 var menu_tab: String = "party"
 var menu_return: String = "explore"
 var map_shore: bool = false
+var map_rain: bool = false
+var ferry_destination: String = "rainstep"
 var battle_region: String = "meadow"
 var selection: int = 0
 var chosen_creature: int = 0
@@ -82,6 +85,7 @@ func _ready() -> void:
 	if has_save:
 		state = saved
 	world.sync_tide_progress(state.flags)
+	world.sync_rain_progress(state.flags)
 	music.set_theme("title")
 	get_tree().auto_accept_quit = false
 
@@ -226,6 +230,9 @@ func _cancel() -> void:
 	elif mode == "new_confirm":
 		mode = "title"
 		selection = 0
+	elif mode == "ferry":
+		mode = "explore"
+		selection = 0
 	elif mode == "dialogue":
 		_advance_dialogue()
 
@@ -238,6 +245,7 @@ func handle_action(action: String) -> void:
 		menu_tab = action.get_slice(":", 1)
 		if menu_tab == "map":
 			map_shore = world.area_id() == "tidepools"
+			map_rain = world.island_id == "rainstep"
 		release_pending = false
 		selection = ["party", "journal", "map", "settings"].find(menu_tab)
 		return
@@ -249,8 +257,20 @@ func handle_action(action: String) -> void:
 		journal_id = int(action.get_slice(":", 1))
 		return
 	match action:
-		"map_shore": map_shore = true
-		"map_island": map_shore = false
+		"map_shore":
+			map_shore = true
+			map_rain = false
+		"map_island":
+			map_shore = false
+			map_rain = false
+		"map_rain":
+			map_rain = true
+			map_shore = false
+		"ferry_cancel":
+			if mode == "ferry":
+				mode = "explore"
+				selection = 0
+		"ferry_board": _board_ferry()
 		"language":
 			Locale.set_language("en" if Locale.chinese() else "zh_CN")
 			preferences.language = Locale.language
@@ -269,9 +289,10 @@ func handle_action(action: String) -> void:
 			mode = "title"
 			selection = 0
 		"continue":
-			world.player_position = state.position if world.can_walk(state.position) else State.HOME_POSITION
+			world.set_island(state.island_id, state.position)
 			world.companion_id = int(state.active().id) if not state.active().is_empty() else -1
 			world.sync_tide_progress(state.flags)
+			world.sync_rain_progress(state.flags)
 			mode = "explore"
 			selection = 0
 			music.set_theme("village" if world.area_id() == "village" else "wild")
@@ -327,9 +348,10 @@ func handle_action(action: String) -> void:
 
 func _new_game() -> void:
 	state = State.new()
-	world.player_position = State.HOME_POSITION
+	world.set_island("wakeharbor", State.HOME_POSITION)
 	world.companion_id = -1
 	world.sync_tide_progress(state.flags)
+	world.sync_rain_progress(state.flags)
 	selection = 0
 	encounter_distance = 0
 	area_timer = 3.0
@@ -380,6 +402,23 @@ func interact() -> void:
 	if npc.is_empty():
 		notify("WALK TO A PERSON OR SIGN, THEN PRESS E.")
 		return
+	if str(npc.role) in ["ferry_out", "ferry_home"]:
+		if str(npc.role) == "ferry_out" and not bool(state.flags.gym):
+			say(npc.name, ["The sea-lane is still hidden. Light the First Light tower before we sail."])
+			return
+		ferry_destination = "rainstep" if str(npc.role) == "ferry_out" else "wakeharbor"
+		var invitation: String = "The First Light has opened the sea-lane. My ferry can take you to Rainstep, where the roof gutters have fallen quiet." if ferry_destination == "rainstep" else "The ferry is ready whenever you want to return to Wakeharbor."
+		say(npc.name, [invitation], func(): mode = "ferry"; selection = 0)
+		return
+	if str(npc.role).begins_with("rain_"):
+		var event: Dictionary = RainStory.interact(state, str(npc.role))
+		if bool(event.changed):
+			world.sync_rain_progress(state.flags)
+			_save(false)
+		music.sfx(str(event.sound))
+		encounter_cooldown = 2.0
+		say(str(event.speaker), event.lines)
+		return
 	if str(npc.role).begins_with("tide_"):
 		var event: Dictionary = ShoreQuest.interact(state, str(npc.role))
 		if bool(event.changed):
@@ -428,6 +467,25 @@ func interact() -> void:
 func _wild_encounter() -> void:
 	var encounter: Dictionary = Encounters.roll(world.area_id(), rng, not bool(state.flags.captured), bool(state.flags.gym))
 	start_battle("wild", [DB.make_creature(int(encounter.id), int(encounter.level))])
+
+func _board_ferry() -> void:
+	if mode != "ferry" or not RainStory.travel(state, ferry_destination):
+		return
+	world.set_island(state.island_id, state.position)
+	world.sync_rain_progress(state.flags)
+	world.sync_tide_progress(state.flags)
+	mode = "explore"
+	menu_return = "explore"
+	selection = 0
+	encounter_distance = 0
+	encounter_cooldown = 3.0
+	area_text = world.area_name()
+	area_timer = 3.3
+	world.companion_id = int(state.active().id)
+	music.set_theme("wild" if state.island_id == "rainstep" else "village")
+	music.sfx("tide_song")
+	_save(false)
+	notify("A quiet crossing brings you safely to the other island.")
 
 func start_battle(kind: String, enemies: Array[Dictionary]) -> void:
 	battle = Rules.new()
@@ -480,7 +538,7 @@ func _finish_battle() -> void:
 	encounter_distance = 0
 	encounter_cooldown = 3.0
 	if battle.outcome == "lost":
-		world.player_position = state.position
+		world.set_island(state.island_id, state.position)
 	world.companion_id = int(state.active().id)
 	_save(false)
 	music.set_theme("village" if world.area_id() == "village" else "wild")
@@ -494,13 +552,17 @@ func _finish_battle() -> void:
 	elif battle.kind == "trainer" and battle.outcome == "won":
 		say("IVO / A PROMISE KEPT", ["That was a real song! Take these supplies. The stone path north leads to the First Light Sanctum.", "Soren has two companions. Bring a friend, use tonics when you need them, and don't forget you can switch."])
 	elif battle.outcome == "lost":
-		say("MIRA / TRY AGAIN", ["I found you on the path. Everyone is safe and rested, and I packed a few spare supplies. Nothing important was lost."])
+		if state.island_id == "rainstep":
+			say("ORLA", ["I brought everyone back to the landing. Your companions are rested, and your progress is safe."])
+		else:
+			say("MIRA / TRY AGAIN", ["I found you on the path. Everyone is safe and rested, and I packed a few spare supplies. Nothing important was lost."])
 
 func _open_menu(tab: String) -> void:
 	menu_return = mode
 	mode = "menu"
 	menu_tab = tab
 	map_shore = world.area_id() == "tidepools"
+	map_rain = world.island_id == "rainstep"
 	selection = ["party", "journal", "map", "settings"].find(tab)
 	chosen_creature = 0
 	release_pending = false
@@ -509,6 +571,7 @@ func _save(show_message: bool) -> void:
 	if not bool(state.flags.starter):
 		return
 	state.position = world.player_position
+	state.island_id = world.island_id
 	var success: bool = state.save_game()
 	if success:
 		has_save = true

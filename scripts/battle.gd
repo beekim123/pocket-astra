@@ -273,11 +273,14 @@ func _lose() -> void:
 	finished = true
 	outcome = "lost"
 	state.heal_all()
-	state.position = GameState.HOME_POSITION
+	state.position = state.recovery_position()
 	state.orbs = maxi(state.orbs, 3)
 	state.tonics = maxi(state.tonics, 2)
 	active_index = 0
-	_say("Your companions need rest. The Keeper brings you home.")
+	if state.island_id == "rainstep":
+		_say("Your companions need rest. Orla brings you to the landing.")
+	else:
+		_say("Your companions need rest. The Keeper brings you home.")
 	_say("Everyone is healed. Your progress is safe; try again.")
 
 

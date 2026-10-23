@@ -1,6 +1,6 @@
 extends SceneTree
 ## Actual GPU-rendered evidence. Outputs go outside the source-only project.
-const Game = preload("res://scripts/main.gd")
+const Game = preload("res://tests/capture_game.gd")
 const DB = preload("res://scripts/creature_db.gd")
 
 func _initialize() -> void:
@@ -47,6 +47,36 @@ func _run() -> void:
 			game.state.collection.assign([0,1,2,3,4,5,6,7])
 			game._open_menu("journal")
 		"settings": game._open_menu("settings")
+		"rainstep", "rain_map", "rain_repair", "rain_battle", "ferry":
+			game.state.choose_starter(2)
+			game.state.flags.captured = true
+			game.state.flags.rival = true
+			game.state.flags.gym = true
+			game.state.flags.rain_arrived = true
+			game.state.flags.rain_started = true
+			game.state.island_id = "rainstep"
+			game.world.set_island("rainstep", Vector3(60, 0, -1.5))
+			game.world.companion_id = 2
+			game.mode = "explore"
+			game.area_text = "RAINSTEP TERRACES"
+			game.area_timer = 0
+			game.encounter_cooldown = 99
+			game.world.sync_rain_progress(game.state.flags)
+			if view == "rain_map":
+				game._open_menu("map")
+			elif view == "rain_repair":
+				game.world.set_island("rainstep", Vector3(67, 0, -1.5))
+				game.interact()
+			elif view == "rain_battle":
+				game.start_battle("wild", [DB.make_creature(6, 6)])
+				game.battle_queue.clear()
+				game.battle_lines.assign(game.battle.log)
+				game.battle_timer = 0
+			elif view == "ferry":
+				game.world.set_island("wakeharbor", Vector3(-13, 0, 4.1))
+				game.state.island_id = "wakeharbor"
+				game.mode = "ferry"
+				game.ferry_destination = "rainstep"
 		"tidepools", "shore_map", "shore_battle", "rescue":
 			game.state.choose_starter(1)
 			game.state.flags.tide_started = true

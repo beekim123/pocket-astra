@@ -6,9 +6,13 @@ const DB = preload("res://scripts/creature_db.gd")
 const SAVE_VERSION: int = 1
 const PARTY_LIMIT: int = 6
 const HOME_POSITION: Vector3 = Vector3(-7.0, 0.0, 5.0)
+const RAIN_POSITION: Vector3 = Vector3(60.0, 0.0, 8.0)
+const FERRY_HOME_POSITION: Vector3 = Vector3(-13.0, 0.0, 4.1)
 const FLAG_KEYS: Array[String] = ["starter", "rival", "gym", "captured"]
 const TIDE_FLAG_KEYS: Array[String] = ["tide_started", "tide_rescued", "tide_rewarded", "tide_wind", "tide_water", "tide_brass"]
-const OPTIONAL_FLAG_KEYS: Array[String] = ["cache", "tide_started", "tide_rescued", "tide_rewarded", "tide_wind", "tide_water", "tide_brass"]
+const RAIN_FLAG_KEYS: Array[String] = ["rain_arrived", "rain_started", "rain_upper", "rain_middle", "rain_lower", "rain_rewarded"]
+const RAIN_REPAIR_KEYS: Array[String] = ["rain_upper", "rain_middle", "rain_lower"]
+const OPTIONAL_FLAG_KEYS: Array[String] = ["cache", "tide_started", "tide_rescued", "tide_rewarded", "tide_wind", "tide_water", "tide_brass", "rain_arrived", "rain_started", "rain_upper", "rain_middle", "rain_lower", "rain_rewarded"]
 
 var party: Array[Dictionary] = []
 var collection: Array[int] = []
@@ -16,9 +20,12 @@ var flags: Dictionary = {
 	"starter": false, "rival": false, "gym": false, "captured": false, "cache": false,
 	"tide_started": false, "tide_rescued": false, "tide_rewarded": false,
 	"tide_wind": false, "tide_water": false, "tide_brass": false,
+	"rain_arrived": false, "rain_started": false, "rain_upper": false,
+	"rain_middle": false, "rain_lower": false, "rain_rewarded": false,
 }
 var orbs: int = 12
 var tonics: int = 5
+var island_id: String = "wakeharbor"
 var position: Vector3 = HOME_POSITION
 var play_seconds: float = 0.0
 
@@ -33,6 +40,10 @@ func choose_starter(id: int) -> void:
 func heal_all() -> void:
 	for creature: Dictionary in party:
 		creature.hp = int(creature.max_hp)
+
+
+func recovery_position() -> Vector3:
+	return RAIN_POSITION if island_id == "rainstep" else HOME_POSITION
 
 
 func add_creature(id: int, level: int) -> bool:
@@ -74,6 +85,7 @@ func save_game(path: String = "user://lanternwake.json") -> bool:
 		"flags": flags,
 		"orbs": orbs,
 		"tonics": tonics,
+		"island_id": island_id,
 		"position": [position.x, position.y, position.z],
 		"play_seconds": play_seconds,
 	}
@@ -127,6 +139,11 @@ func load_game(path: String = "user://lanternwake.json") -> bool:
 	for component: Variant in data.position:
 		if not _valid_number(component, -1000.0, 1000.0):
 			return false
+	if data.has("island_id") and not data.island_id is String:
+		return false
+	var new_island_id: String = data.get("island_id", "wakeharbor")
+	if new_island_id not in ["wakeharbor", "rainstep"]:
+		return false
 	var new_flags: Dictionary = {}
 	for key: String in FLAG_KEYS:
 		if not data.flags.has(key) or not data.flags[key] is bool:
@@ -149,6 +166,19 @@ func load_game(path: String = "user://lanternwake.json") -> bool:
 		for key: String in TIDE_FLAG_KEYS:
 			if bool(new_flags[key]):
 				return false
+	if not bool(new_flags.rain_arrived) and (new_island_id == "rainstep" or bool(new_flags.rain_started)):
+		return false
+	if not bool(new_flags.gym) or not bool(new_flags.starter):
+		if new_island_id == "rainstep":
+			return false
+		for key: String in RAIN_FLAG_KEYS:
+			if bool(new_flags[key]):
+				return false
+	for key: String in RAIN_REPAIR_KEYS:
+		if bool(new_flags[key]) and not bool(new_flags.rain_started):
+			return false
+		if bool(new_flags.rain_rewarded) and not bool(new_flags[key]):
+			return false
 	var new_collection: Array[int] = []
 	for id: Variant in data.collection:
 		if not _valid_int(id, 0, DB.SPECIES.size() - 1) or new_collection.has(int(id)):
@@ -176,11 +206,12 @@ func load_game(path: String = "user://lanternwake.json") -> bool:
 	flags = new_flags
 	orbs = int(data.orbs)
 	tonics = int(data.tonics)
+	island_id = new_island_id
 	position = Vector3(float(data.position[0]), float(data.position[1]), float(data.position[2]))
 	play_seconds = float(data.play_seconds)
 	if not party.is_empty() and not _has_healthy_creature():
 		heal_all()
-		position = HOME_POSITION
+		position = recovery_position()
 	return true
 
 

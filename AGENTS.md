@@ -24,7 +24,7 @@ Godot worker 池限制 1，测试串行；`OMP_NUM_THREADS / OPENBLAS_NUM_THREAD
 
 1. 读取 `docs/v2/status.md`、`docs/design/expansion-roadmap.md`、Git 工作区及远端状态。保留用户和其它聊天的改动；不强制推送、硬重置或擅自丢弃工作。
 2. 自行选择最近可完成的扩展，记录设计、验证边界和完成条件。首选修复/收尾已经开始的增量。
-3. 实现后运行适当测试；涉及 UI/美术时真实渲染并检查截图。完整检查脚本是 `sh tools/verify.sh`。检查日志中的 ERROR/FAIL/WARNING，不能只看退出码。
+3. 实现后运行适当测试；涉及 UI/美术时真实渲染并检查截图。完整检查脚本是 `sh tools/verify.sh`，它自动创建独立项目和 `LanternwakeValidation` 用户数据命名空间。单独执行测试/截图也先用 `tools/prepare_validation.py` 准备隔离副本并导入；截图必须使用禁用保存的 `tests/capture_game.gd`。不得让验证修改真实玩家存档。检查日志中的 ERROR/FAIL/WARNING，不能只看退出码。
 4. 进行独立审查，修复阻塞。更新 `README.md`、迭代记录、`docs/v2/status.md`，区分实现完成、技术审核、用户验收和远端发布状态。
 5. 每个验证完成的扩展独立提交并推送到 `origin/main`。推送前重新检查远端，不覆盖他人提交。若主分支受保护，改走独立分支和 PR，并在当前聊天附上 PR。
 6. 远端核对实际 commit SHA。失败时保留本地成果、明确记录待推送，下一轮优先补推，不假报发布成功。
