@@ -7,6 +7,8 @@ const Rules = preload("res://scripts/battle.gd")
 const World = preload("res://scripts/world.gd")
 const UI = preload("res://scripts/game_ui.gd")
 const Music = preload("res://scripts/music.gd")
+const Locale = preload("res://scripts/localization.gd")
+const Preferences = preload("res://scripts/preferences.gd")
 
 var state: GameState = State.new()
 var world: LanternWorld
@@ -43,9 +45,12 @@ var reduced_effects: bool = false
 var postprocess: ColorRect
 var rng := RandomNumberGenerator.new()
 var _quitting: bool = false
+var preferences := Preferences.new()
 
 func _ready() -> void:
 	Engine.max_fps = 60
+	preferences.load_settings(_preferences_path())
+	Locale.set_language(preferences.language)
 	rng.randomize()
 	_setup_input()
 	world = World.new()
@@ -149,6 +154,9 @@ func _input(event: InputEvent) -> void:
 	if not event is InputEventKey or not event.pressed or event.echo:
 		return
 	var key: int = event.physical_keycode
+	if key == KEY_L:
+		handle_action("language")
+		return
 	if key == KEY_F11:
 		var fullscreen: bool = DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if fullscreen else DisplayServer.WINDOW_MODE_FULLSCREEN)
@@ -234,6 +242,13 @@ func handle_action(action: String) -> void:
 		journal_id = int(action.get_slice(":", 1))
 		return
 	match action:
+		"language":
+			Locale.set_language("en" if Locale.chinese() else "zh_CN")
+			preferences.language = Locale.language
+			if not preferences.save_settings(_preferences_path()):
+				notify("COULD NOT SAVE LANGUAGE PREFERENCE.")
+			else:
+				notify("LANGUAGE: SIMPLIFIED CHINESE" if Locale.chinese() else "LANGUAGE: ENGLISH")
 		"new":
 			if has_save:
 				mode = "new_confirm"
@@ -486,6 +501,9 @@ func _save(show_message: bool) -> void:
 func notify(message: String) -> void:
 	toast = message
 	toast_time = 3.2
+
+func _preferences_path() -> String:
+	return "user://preferences.cfg"
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:

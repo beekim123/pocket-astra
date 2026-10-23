@@ -9,6 +9,8 @@ var failures: int = 0
 
 
 func _initialize() -> void:
+	# This suite characterizes the original ASCII glyph contract independently.
+	preload("res://scripts/localization.gd").set_language("en")
 	_test_creatures()
 	_test_people()
 	_test_ground()

@@ -7,7 +7,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 ALLOWED = {".gd", ".gdshader", ".tscn", ".godot", ".md", ".sh", ".py", ".uid"}
 DIRECTORIES = ("scenes", "scripts", "shaders", "tests", "tools", "docs")
-files = [ROOT / "project.godot", ROOT / "README.md", ROOT / ".gitignore"]
+files = [ROOT / "project.godot", ROOT / "README.md", ROOT / ".gitignore", ROOT / "AGENTS.md"]
 for directory in DIRECTORIES:
     files.extend(p for p in (ROOT / directory).rglob("*") if p.is_file() and p.suffix in ALLOWED)
 destination = ROOT / "dist" / "Lanternwake-Godot-4.7.2.zip"

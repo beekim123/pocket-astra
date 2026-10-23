@@ -18,6 +18,7 @@ func _run() -> void:
 		view = args[0]
 	if args.size() > 1:
 		output = args[1]
+	preload("res://scripts/localization.gd").set_language(args[2] if args.size() > 2 else "zh_CN")
 	game.state = GameState.new()
 	game.has_save = false
 	match view:
@@ -39,12 +40,16 @@ func _run() -> void:
 			game.state.add_creature(3, 4)
 			game.start_battle("gym", [DB.make_creature(7, 7)])
 			game.battle_queue.clear()
-			game.battle_lines.assign(["Soren's Noctulume spreads its luminous wings.", "What will Cindermew do?"])
+			game.battle_lines.assign(game.battle.log)
 			game.battle_timer = 0
 		"journal":
 			game.state.choose_starter(0)
 			game.state.collection.assign([0,1,2,3,4,5,6,7])
 			game._open_menu("journal")
+		"settings": game._open_menu("settings")
+		"dialogue":
+			game.state.choose_starter(0)
+			game.say("EDDA / LANTERN KEEPER", ["Every island has a song. Ours has been quiet since the great mist swallowed the sea-lanes."])
 		"ending":
 			game.state.choose_starter(0)
 			game.state.add_creature(3, 5)

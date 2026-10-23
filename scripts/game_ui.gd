@@ -3,6 +3,7 @@ extends Control
 const F = preload("res://scripts/pixel_font.gd")
 const Art = preload("res://scripts/art.gd")
 const DB = preload("res://scripts/creature_db.gd")
+const Locale = preload("res://scripts/localization.gd")
 const INK := Color("142b34")
 const PANEL := Color(0.045, 0.10, 0.14, 0.96)
 const CREAM := Color("f1e4c5")
@@ -48,9 +49,9 @@ func _center(value: String, pos: Vector2, size: int = 2, color: Color = CREAM) -
 
 func _paragraph(value: String, pos: Vector2, chars: int, size: int = 2, color: Color = CREAM, line_gap: int = 9) -> float:
 	var y: float = pos.y
-	for line in F.wrap(value, chars):
+	for line in F.wrap(value, chars, size):
 		_text(line, Vector2(pos.x, y), size, color)
-		y += 7 * size + line_gap
+		y += maxf(7 * size + line_gap, F.line_height(size))
 	return y
 
 func _panel(rect: Rect2, border: Color = MIST, alpha: float = 0.95) -> void:
@@ -69,7 +70,8 @@ func _button(action: String, label: String, rect: Rect2, size: int = 2, enabled:
 	draw_rect(rect, Color(color.r, color.g, color.b, 0.9 if active else 0.4), false, 1)
 	if active:
 		draw_rect(Rect2(rect.position, Vector2(3, rect.size.y)), GOLD)
-	_center(label, rect.get_center() - Vector2(0, size * 3.5), size, color if enabled else Color("607775"))
+	var label_height: float = F.line_height(size) - 2 if Locale.chinese() else size * 7
+	_center(label, rect.get_center() - Vector2(0, label_height * 0.5), size, color if enabled else Color("607775"))
 	buttons.append({"action":action if enabled else "", "rect":rect})
 
 func button_at(pos: Vector2) -> String:
@@ -100,8 +102,12 @@ func _title() -> void:
 	_text("AN ORIGINAL CREATURE-KEEPING TALE", Vector2(72, 65), 2, MIST)
 	_crest(Vector2(112, 147), 35)
 	draw_line(Vector2(173, 146), Vector2(467, 146), Color(GOLD.r, GOLD.g, GOLD.b, 0.5), 1)
-	_text("LANTERN", Vector2(68, 206), 9, CREAM)
-	_text("WAKE", Vector2(68, 283), 9, CREAM)
+	if Locale.chinese():
+		_text("灯潮纪", Vector2(65, 205), 9, CREAM)
+		_text("L A N T E R N W A K E", Vector2(73, 319), 2, GOLD)
+	else:
+		_text("LANTERN", Vector2(68, 206), 9, CREAM)
+		_text("WAKE", Vector2(68, 283), 9, CREAM)
 	_text("CHAPTER I  /  THE FIRST LIGHT", Vector2(74, 378), 2, GOLD)
 	_text("A SMALL ISLAND. A SONG IN THE REEDS.", Vector2(74, 419), 2, MIST)
 	_text("A LIGHT TO GUIDE YOU HOME.", Vector2(74, 446), 2, MIST)
@@ -110,6 +116,7 @@ func _title() -> void:
 		_button("continue", "CONTINUE JOURNEY", Rect2(73, y, 337, 47))
 		y += 57
 	_button("new", "BEGIN A NEW JOURNEY", Rect2(73, y, 337, 47))
+	_button("language", "LANGUAGE: SIMPLIFIED CHINESE" if Locale.chinese() else "LANGUAGE: ENGLISH", Rect2(1040, 610, 213, 35), 1)
 	_text("ENTER / SELECT    ARROWS / CHOOSE", Vector2(74, 666), 1, MIST)
 	_text("EVERY PIXEL. EVERY NOTE. MADE OF CODE.", Vector2(801, 670), 1, CREAM)
 	_text("WAKEHARBOR  /  AUTUMN TIDE", Vector2(868, 43), 2, CREAM)
@@ -334,11 +341,12 @@ func _settings_menu() -> void:
 	_button("save", "SAVE JOURNEY NOW", Rect2(82, 242, 430, 51), 2, game.menu_return != "battle")
 	_button("mute", "SOUND: OFF" if game.music.muted else "SOUND: ON", Rect2(82, 313, 430, 51), 2)
 	_button("effects", "SOFT FOCUS: OFF" if game.reduced_effects else "SOFT FOCUS: ON", Rect2(82, 384, 430, 51), 2)
+	_button("language", "LANGUAGE: SIMPLIFIED CHINESE" if Locale.chinese() else "LANGUAGE: ENGLISH", Rect2(82, 450, 430, 43), 2)
 	_text("CONTROLS", Vector2(612, 185), 2, GOLD)
 	var controls := ["WASD / ARROWS    WALK", "SHIFT           RUN", "E / ENTER       TALK & CONFIRM", "TAB / ESC       SATCHEL & BACK", "J / P           JOURNAL / PARTY", "1-7             BATTLE ACTION", "M / F11         MUTE / FULLSCREEN", "F5              QUICK SAVE"]
 	for i in range(controls.size()):
 		_text(controls[i], Vector2(612, 238 + i * 34), 2, CREAM)
-	_paragraph("Your journey saves after milestones and while exploring. Closing during a battle returns to the last safe save.", Vector2(83, 491), 36, 2, MIST)
+	_paragraph("Your journey saves after milestones and while exploring. Closing during a battle returns to the last safe save.", Vector2(83, 519), 36, 2, MIST)
 	_text("ORIGINAL CODE ART / ORIGINAL SYNTH SCORE / GODOT 4.7.2", Vector2(612, 572), 1, GOLD)
 
 func _ending() -> void:

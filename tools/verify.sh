@@ -31,7 +31,11 @@ run_check() {
 run_check import --editor --import --quit
 run_check rules --script tests/test_rules.gd
 run_check journey --script tests/test_journey.gd
+run_check journey_english --script tests/test_journey.gd -- en
 run_check art --script tests/test_art.gd
 run_check music --script tests/test_music.gd
+run_check localization --script tests/test_localization.gd
+run_check chinese_font --script tests/test_chinese_font.gd
+run_check preferences --script tests/test_preferences.gd
 run_check startup --quit-after 30
 echo "All sequential checks passed. Logs: $log_dir"

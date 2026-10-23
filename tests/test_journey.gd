@@ -5,6 +5,9 @@ var checks: int = 0
 var failures: int = 0
 
 class Harness extends "res://scripts/main.gd":
+	func _preferences_path() -> String:
+		return "user://journey_test_preferences_%d.cfg" % OS.get_process_id()
+
 	func _save(_show_message: bool) -> void:
 		state.position = world.player_position
 		state.save_game("user://journey_test_only.json")
@@ -52,6 +55,13 @@ func _run() -> void:
 	root.add_child(game)
 	await process_frame
 	check(game.mode == "title", "opens on title")
+	check(GameLocale.chinese(), "a clean start displays Chinese")
+	game.handle_action("language")
+	check(GameLocale.language == "en", "language toggles without leaving title")
+	game.handle_action("language")
+	check(GameLocale.chinese(), "language toggles back to Chinese")
+	var language: String = "en" if OS.get_cmdline_user_args().has("en") else "zh_CN"
+	GameLocale.set_language(language)
 	game.has_save = false
 	game.handle_action("new")
 	drain_dialogue(game)
@@ -123,7 +133,8 @@ func _run() -> void:
 	var saved := GameState.new()
 	check(saved.load_game("user://journey_test_only.json") and saved.flags.gym, "ending persists in save")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://journey_test_only.json"))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(game._preferences_path()))
 	game.queue_free()
 	await process_frame
-	print("JOURNEY TESTS: %d checks, %d failures" % [checks, failures])
+	print("JOURNEY TESTS [%s]: %d checks, %d failures" % [language, checks, failures])
 	quit(0 if failures == 0 else 1)
