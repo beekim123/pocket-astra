@@ -7,6 +7,7 @@ const Locale = preload("res://scripts/localization.gd")
 const ShoreQuest = preload("res://scripts/tide_quest.gd")
 const RainStory = preload("res://scripts/rain_quest.gd")
 const Challenges = preload("res://scripts/challenge_db.gd")
+const WindStory = preload("res://scripts/wind_quest.gd")
 const INK := Color("142b34")
 const PANEL := Color(0.045, 0.10, 0.14, 0.96)
 const CREAM := Color("f1e4c5")
@@ -41,6 +42,9 @@ func _draw() -> void:
 		"ferry":
 			_exploration(false)
 			_ferry_dialogue()
+		"route":
+			_exploration(false)
+			_route_dialogue()
 		"ending": _ending()
 	if game.toast_time > 0:
 		var w: float = minf(1180, F.width(game.toast, 2) + 44)
@@ -114,8 +118,8 @@ func _title() -> void:
 	else:
 		_text("LANTERN", Vector2(68, 206), 9, CREAM)
 		_text("WAKE", Vector2(68, 283), 9, CREAM)
-	_text("TWO ISLANDS  /  TWO LIGHTS", Vector2(74, 378), 2, GOLD)
-	_text("TWO SMALL ISLANDS. SONGS ACROSS THE SEA.", Vector2(74, 419), 2, MIST)
+	_text("THREE SHORES  /  TWO LIGHTS", Vector2(74, 378), 2, GOLD)
+	_text("A SMALL BOAT. A SONG BEYOND THE REEF.", Vector2(74, 419), 2, MIST)
 	_text("A LIGHT TO GUIDE YOU HOME.", Vector2(74, 446), 2, MIST)
 	var y: float = 523
 	if game.has_save:
@@ -159,7 +163,7 @@ func _starters() -> void:
 
 func _exploration(show_controls: bool = true) -> void:
 	_panel(Rect2(28, 24, 338, 61), GOLD, 0.91)
-	_text("THE SECOND LIGHT / CHAPTER II" if game.world.island_id == "rainstep" else "THE FIRST LIGHT  /  CHAPTER I", Vector2(46, 35), 1, GOLD)
+	_text("WINDCHART / A SHORT CROSSING" if game.world.island_id == "windchart" else ("THE SECOND LIGHT / CHAPTER II" if game.world.island_id == "rainstep" else "THE FIRST LIGHT  /  CHAPTER I"), Vector2(46, 35), 1, GOLD)
 	_text(game.world.area_name(), Vector2(46, 55), 2)
 	_panel(Rect2(790, 24, 462, 92), MIST, 0.91)
 	_text("YOUR NEXT STEP", Vector2(811, 39), 1, GOLD)
@@ -174,7 +178,10 @@ func _exploration(show_controls: bool = true) -> void:
 	if show_controls:
 		if bool(game.state.flags.starter):
 			_panel(Rect2(28, 562, 338, 82), TEAL, 0.90)
-			if game.world.island_id == "rainstep":
+			if game.world.island_id == "windchart":
+				_text("WINDCHART NOTES", Vector2(45, 575), 1, TEAL)
+				_text("NAVIGATION MARKERS %d / 3" % WindStory.marker_count(game.state), Vector2(45, 599), 1, CREAM)
+			elif game.world.island_id == "rainstep":
 				_text("RAINSTEP WATERWORKS", Vector2(45, 575), 1, TEAL)
 				_text("WATER CHANNELS %d / 3" % RainStory.repaired_count(game.state), Vector2(45, 599), 1, CREAM)
 			else:
@@ -202,10 +209,21 @@ func _dialogue() -> void:
 func _ferry_dialogue() -> void:
 	draw_rect(Rect2(0, 0, 1280, 720), Color(0.02, 0.07, 0.10, 0.42))
 	_panel(Rect2(320, 221, 640, 292), GOLD)
-	_center("FERRY TO RAINSTEP" if game.ferry_destination == "rainstep" else "FERRY TO WAKEHARBOR", Vector2(640, 257), 3, CREAM)
-	_paragraph("Follow the dry paths. Orla offers free rest by the landing, and Venn can always take you home.", Vector2(360, 321), 45, 2, MIST)
+	_center("FERRY TO WINDCHART" if game.ferry_destination == "windchart" else ("FERRY TO RAINSTEP" if game.ferry_destination == "rainstep" else "FERRY TO WAKEHARBOR"), Vector2(640, 257), 3, CREAM)
+	var crossing_text: String = "Read three markers at Windchart Quay, then choose a sheltered route. The ferry back to Rainstep is always free." if game.ferry_destination == "windchart" else "Follow the dry paths. Orla offers free rest by the landing, and Venn can always take you home."
+	_paragraph(crossing_text, Vector2(360, 321), 45, 2, MIST)
 	_button("ferry_board", "BOARD FERRY", Rect2(360, 435, 260, 43), 2)
 	_button("ferry_cancel", "STAY HERE", Rect2(640, 435, 280, 43), 2)
+
+func _route_dialogue() -> void:
+	draw_rect(Rect2(0, 0, 1280, 720), Color(0.02, 0.07, 0.10, 0.56))
+	_panel(Rect2(250, 165, 780, 440), GOLD)
+	_center("CHOOSE A SHELTERED ROUTE", Vector2(640, 192), 3, CREAM)
+	_paragraph("Wind drives toward the eastern reef. The middle shoal is shallow. The berth opens to the deep southern channel.", Vector2(288, 245), 58, 2, MIST)
+	_button("route:north", "NORTH / MIDDLE SHOAL", Rect2(290, 342, 700, 47), 2)
+	_button("route:east", "EAST / EXPOSED REEF", Rect2(290, 400, 700, 47), 2)
+	_button("route:south", "SOUTH / LEEWARD ARC", Rect2(290, 458, 700, 47), 2)
+	_button("ferry_cancel", "STAY AT THE QUAY", Rect2(430, 538, 420, 40), 2)
 
 func _health(creature: Dictionary, pos: Vector2, enemy_side: bool = false) -> void:
 	var info: Dictionary = DB.species(int(creature.id))
@@ -350,6 +368,11 @@ func _map_menu() -> void:
 	_button("map_shore", "SHORE MAP", Rect2(238, 151, 155, 22), 1)
 	if bool(game.state.flags.gym):
 		_button("map_rain", "RAINSTEP MAP", Rect2(402, 151, 155, 22), 1)
+	if bool(game.state.flags.rain_gym):
+		_button("map_wind", "WINDCHART MAP", Rect2(566, 151, 155, 22), 1)
+	if game.map_wind:
+		_wind_map()
+		return
 	if game.map_rain:
 		_rain_map()
 		return
@@ -482,6 +505,49 @@ func _rain_map() -> void:
 	var beacon: Vector2 = _rain_point(Vector2(60, -8.6))
 	draw_circle(beacon, 7, TEAL if game.state.flags.rain_gym else GOLD)
 	_text("SECOND LIGHT BEACON", beacon + Vector2(12, -3), 1, CREAM)
+
+func _wind_point(point: Vector2) -> Vector2:
+	return Vector2(100 + (point.x - 108) * 15, 200 + (point.y + 11) * 17.5)
+
+func _wind_map() -> void:
+	draw_rect(Rect2(74, 178, 681, 435), Color("244b58"))
+	for bounds: Rect2 in [game.world.windchart.BOUNDS, game.world.windchart.BERTH_BOUNDS]:
+		draw_rect(Rect2(_wind_point(bounds.position), bounds.size * Vector2(15, 17.5)), Color("9ba393"))
+	for endpoints: Array in [[Vector2(120, -6.8), Vector2(120, 9.4)], [Vector2(112, -5), Vector2(128, -5)], [Vector2(112, 3), Vector2(128, 3)], [Vector2(112, -5), Vector2(112, 3)], [Vector2(128, -5), Vector2(128, 3)], [Vector2(116, 6), Vector2(120, 6)], [Vector2(140, -1), Vector2(140, 4)]]:
+		draw_line(_wind_point(endpoints[0]), _wind_point(endpoints[1]), Color("c3b58b"), 10)
+	for obstacle: Rect2 in game.world.windchart.obstacles:
+		draw_rect(Rect2(_wind_point(obstacle.position), obstacle.size * Vector2(15, 17.5)), Color("697c7e"))
+	var dock: Vector2 = _wind_point(Vector2(120, 8))
+	var berth: Vector2 = _wind_point(Vector2(140, 2))
+	if game.state.flags.wind_sailed:
+		draw_polyline(PackedVector2Array([dock, _wind_point(Vector2(126, 10)), _wind_point(Vector2(139, 8)), berth]), GOLD, 2, true)
+	for i in range(game.world.windchart.MARKERS.size()):
+		var marker: Dictionary = game.world.windchart.MARKERS[i]
+		var point := _wind_point(Vector2(marker.pos.x, marker.pos.z))
+		draw_circle(point, 10, TEAL if game.state.flags[marker.role] else INK)
+		_center(str(i + 1), point - Vector2(0, 4), 1, CREAM)
+	_text("WINDCHART QUAY", Vector2(132, 224), 1, INK)
+	_center("LEE BERTH", Vector2(580, 320), 1, INK)
+	_text("MAREN / REST", _wind_point(Vector2(112, 5)), 1, INK)
+	draw_circle(_wind_point(Vector2(120, -3)), 5, GOLD)
+	_center("CHART TABLE", _wind_point(Vector2(120, -2)), 1, INK)
+	_center("FERRY TO RAINSTEP", dock + Vector2(0, 22), 1, INK)
+	_text("SELA", berth + Vector2(-14, -40), 1, INK)
+	draw_circle(berth, 6, TEAL if game.state.flags.wind_rewarded else GOLD)
+	if game.world.island_id == "windchart":
+		var player: Vector3 = game.world.player_position
+		var position := _wind_point(Vector2(player.x, player.z))
+		draw_circle(position, 5, CREAM)
+		draw_arc(position, 12, 0, TAU, 24, GOLD, 1)
+	_text("WINDCHART NOTES", Vector2(800, 184), 2, GOLD)
+	_paragraph(WindStory.objective(game.state), Vector2(800, 225), 32, 2, CREAM)
+	_text("NAVIGATION MARKERS %d / 3" % WindStory.marker_count(game.state), Vector2(800, 322), 2, TEAL)
+	var notes: Array[String] = ["WIND / AVOID THE EAST REEF", "TIDE / DEEP WATER TO THE SOUTH", "LIGHT / ENTER FROM THE SOUTH"]
+	for i in range(3):
+		var known: bool = game.state.flags[game.world.windchart.MARKERS[i].role]
+		draw_circle(Vector2(810, 376 + i * 47), 5, TEAL if known else MIST)
+		_text(notes[i] if known else "UNREAD NAVIGATION MARKER", Vector2(828, 371 + i * 47), 1, CREAM)
+	_paragraph("Read all three markers, then use the chart table. Wrong choices cost nothing. Maren can take you back to Rainstep.", Vector2(800, 527), 32, 2, MIST)
 
 func _settings_menu() -> void:
 	_text("A COMFORTABLE JOURNEY", Vector2(82, 185), 2, GOLD)

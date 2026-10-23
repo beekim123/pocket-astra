@@ -68,6 +68,43 @@ func _run() -> void:
 			game.battle_lines.assign(game.battle.log)
 			game.battle_timer = 0
 		"settings": game._open_menu("settings")
+		"wind_quay", "wind_marker", "wind_map", "wind_route", "wind_berth", "wind_ferry":
+			game.state.choose_starter(0)
+			game.state.add_creature(8, 7)
+			game.state.add_creature(10, 7)
+			for key: String in ["captured", "rival", "gym", "rain_arrived", "rain_started", "rain_upper", "rain_middle", "rain_lower", "rain_rewarded", "rain_trial", "rain_gym", "wind_arrived"]:
+				game.state.flags[key] = true
+			if view in ["wind_route", "wind_map", "wind_berth"]:
+				for key: String in ["wind_wind", "wind_tide", "wind_light"]:
+					game.state.flags[key] = true
+			if view == "wind_berth":
+				game.state.flags.wind_sailed = true
+				game.state.flags.wind_rewarded = true
+			game.state.island_id = "windchart"
+			var spawn := Vector3(120, 0, 1)
+			if view == "wind_marker":
+				spawn = Vector3(112, 0, -5)
+			elif view == "wind_berth":
+				spawn = Vector3(140, 0, 1)
+			game.world.set_island("windchart", spawn)
+			game.state.position = spawn
+			game.world.sync_wind_progress(game.state.flags)
+			game.world.companion_id = 0
+			game.mode = "explore"
+			game.area_text = game.world.area_name()
+			game.area_timer = 0
+			if view == "wind_map":
+				game._open_menu("map")
+			elif view == "wind_route":
+				game.mode = "route"
+			elif view == "wind_marker":
+				game.interact()
+			elif view == "wind_ferry":
+				game.state.island_id = "rainstep"
+				game.state.flags.wind_arrived = false
+				game.world.set_island("rainstep", Vector3(64, 0, 7))
+				game.ferry_destination = "windchart"
+				game.mode = "ferry"
 		"second_beacon", "second_unlit", "second_map", "neri_battle", "second_battle", "second_ending":
 			game.state.choose_starter(0)
 			game.state.party[0] = DB.make_creature(0, 8)

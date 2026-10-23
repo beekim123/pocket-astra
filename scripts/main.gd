@@ -14,6 +14,7 @@ const Encounters = preload("res://scripts/encounter_tables.gd")
 const RainStory = preload("res://scripts/rain_quest.gd")
 const Journal = preload("res://scripts/field_journal.gd")
 const Challenges = preload("res://scripts/challenge_db.gd")
+const WindStory = preload("res://scripts/wind_quest.gd")
 
 var state: GameState = State.new()
 var world: LanternWorld
@@ -26,6 +27,7 @@ var menu_tab: String = "party"
 var menu_return: String = "explore"
 var map_shore: bool = false
 var map_rain: bool = false
+var map_wind: bool = false
 var ferry_destination: String = "rainstep"
 var battle_region: String = "meadow"
 var selection: int = 0
@@ -90,6 +92,7 @@ func _ready() -> void:
 		state = saved
 	world.sync_tide_progress(state.flags)
 	world.sync_rain_progress(state.flags)
+	world.sync_wind_progress(state.flags)
 	music.set_theme("title")
 	get_tree().auto_accept_quit = false
 
@@ -237,7 +240,7 @@ func _cancel() -> void:
 	elif mode == "new_confirm":
 		mode = "title"
 		selection = 0
-	elif mode == "ferry":
+	elif mode in ["ferry", "route"]:
 		mode = "explore"
 		selection = 0
 	elif mode == "dialogue":
@@ -253,8 +256,12 @@ func handle_action(action: String) -> void:
 		if menu_tab == "map":
 			map_shore = world.area_id() == "tidepools"
 			map_rain = world.island_id == "rainstep"
+			map_wind = world.island_id == "windchart"
 		release_pending = false
 		selection = ["party", "journal", "map", "settings"].find(menu_tab)
+		return
+	if action.begins_with("route:"):
+		_sail_route(action.get_slice(":", 1))
 		return
 	if action.begins_with("party:"):
 		chosen_creature = int(action.get_slice(":", 1))
@@ -274,17 +281,24 @@ func handle_action(action: String) -> void:
 	match action:
 		"journal_previous": _change_journal_page(-1)
 		"journal_next": _change_journal_page(1)
+		"map_wind":
+			map_wind = true
+			map_shore = false
+			map_rain = false
 		"map_shore":
+			map_wind = false
 			map_shore = true
 			map_rain = false
 		"map_island":
+			map_wind = false
 			map_shore = false
 			map_rain = false
 		"map_rain":
+			map_wind = false
 			map_rain = true
 			map_shore = false
 		"ferry_cancel":
-			if mode == "ferry":
+			if mode in ["ferry", "route"]:
 				mode = "explore"
 				selection = 0
 		"ferry_board": _board_ferry()
@@ -310,6 +324,7 @@ func handle_action(action: String) -> void:
 			world.companion_id = int(state.active().id) if not state.active().is_empty() else -1
 			world.sync_tide_progress(state.flags)
 			world.sync_rain_progress(state.flags)
+			world.sync_wind_progress(state.flags)
 			mode = "explore"
 			selection = 0
 			music.set_theme("village" if world.area_id() == "village" else "wild")
@@ -372,6 +387,7 @@ func _new_game() -> void:
 	world.companion_id = -1
 	world.sync_tide_progress(state.flags)
 	world.sync_rain_progress(state.flags)
+	world.sync_wind_progress(state.flags)
 	selection = 0
 	encounter_distance = 0
 	area_timer = 3.0
@@ -422,6 +438,30 @@ func interact() -> void:
 	if npc.is_empty():
 		notify("WALK TO A PERSON OR SIGN, THEN PRESS E.")
 		return
+	if str(npc.role) in ["wind_ferry_out", "wind_ferry_home"]:
+		if str(npc.role) == "wind_ferry_out" and not bool(state.flags.rain_gym):
+			say(npc.name, ["The new crossing needs both guiding lights. Complete Ilya's trial before we sail to Windchart Quay."])
+			return
+		ferry_destination = "windchart" if str(npc.role) == "wind_ferry_out" else "rainstep"
+		say(npc.name, ["My ferry links Rainstep and Windchart Quay. The crossing is free, and I will always bring you back."], func(): mode = "ferry"; selection = 0)
+		return
+	if str(npc.role) == "wind_return":
+		state.position = world.player_position
+		if WindStory.return_to_quay(state):
+			_arrive_from_crossing()
+		return
+	if str(npc.role).begins_with("wind_"):
+		state.position = world.player_position
+		var event: Dictionary = WindStory.interact(state, str(npc.role))
+		if bool(event.changed):
+			world.sync_wind_progress(state.flags)
+			_save(false)
+		music.sfx(str(event.sound))
+		if str(npc.role) == "wind_chart" and WindStory.can_sail(state):
+			say(str(event.speaker), event.lines, func(): mode = "route"; selection = 0)
+		else:
+			say(str(event.speaker), event.lines)
+		return
 	if str(npc.role) in ["ferry_out", "ferry_home"]:
 		if str(npc.role) == "ferry_out" and not bool(state.flags.gym):
 			say(npc.name, ["The sea-lane is still hidden. Light the First Light tower before we sail."])
@@ -452,6 +492,7 @@ func interact() -> void:
 			event.lines.append("Three new resonants shelter by Rainstep's channels, warm stones, and roof eaves. Look among the pale plants, then weaken them before capture.")
 		if bool(event.changed):
 			world.sync_rain_progress(state.flags)
+			world.sync_wind_progress(state.flags)
 			_save(false)
 		music.sfx(str(event.sound))
 		encounter_cooldown = 2.0
@@ -507,10 +548,17 @@ func _wild_encounter() -> void:
 	start_battle("wild", [DB.make_creature(int(encounter.id), int(encounter.level))])
 
 func _board_ferry() -> void:
-	if mode != "ferry" or not RainStory.travel(state, ferry_destination):
+	if mode != "ferry":
 		return
+	var wind_crossing: bool = state.island_id == "windchart" or ferry_destination == "windchart"
+	var travelled: bool = WindStory.travel(state, ferry_destination) if wind_crossing else RainStory.travel(state, ferry_destination)
+	if travelled:
+		_arrive_from_crossing()
+
+func _arrive_from_crossing() -> void:
 	world.set_island(state.island_id, state.position)
 	world.sync_rain_progress(state.flags)
+	world.sync_wind_progress(state.flags)
 	world.sync_tide_progress(state.flags)
 	mode = "explore"
 	menu_return = "explore"
@@ -524,6 +572,21 @@ func _board_ferry() -> void:
 	music.sfx("tide_song")
 	_save(false)
 	notify("A quiet crossing brings you safely to the other island.")
+
+func _sail_route(route: String) -> void:
+	if mode != "route":
+		return
+	state.position = world.player_position
+	var departure: Vector3 = state.position
+	var event: Dictionary = WindStory.choose_route(state, route)
+	var arrived: bool = state.position != departure
+	if arrived:
+		_arrive_from_crossing()
+	music.sfx(str(event.sound))
+	if arrived:
+		say(str(event.speaker), event.lines)
+	else:
+		say(str(event.speaker), event.lines, func(): mode = "route"; selection = 0)
 
 func start_battle(kind: String, enemies: Array[Dictionary]) -> void:
 	battle = Rules.new()
@@ -594,6 +657,7 @@ func _finish_battle() -> void:
 		world.set_island(state.island_id, state.position)
 	world.companion_id = int(state.active().id)
 	world.sync_rain_progress(state.flags)
+	world.sync_wind_progress(state.flags)
 	_save(false)
 	music.set_theme("village" if world.area_id() == "village" else "wild")
 	if battle.challenge_id == "second_light" and battle.outcome == "won":
@@ -622,6 +686,7 @@ func _open_menu(tab: String) -> void:
 	menu_tab = tab
 	map_shore = world.area_id() == "tidepools"
 	map_rain = world.island_id == "rainstep"
+	map_wind = world.island_id == "windchart"
 	selection = ["party", "journal", "map", "settings"].find(tab)
 	chosen_creature = 0
 	release_pending = false
@@ -638,6 +703,8 @@ func _show_second_ending() -> void:
 	], func(): mode = "ending"; selection = 0)
 
 func objective_text() -> String:
+	if bool(state.flags.rain_gym):
+		return WindStory.objective(state)
 	var challenge_goal: String = Challenges.objective(state)
 	if not challenge_goal.is_empty():
 		return challenge_goal

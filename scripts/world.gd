@@ -5,12 +5,16 @@ extends Node3D
 const Art = preload("res://scripts/art.gd")
 const Tidepool = preload("res://scripts/tidepool_world.gd")
 const Rainstep = preload("res://scripts/rainstep_world.gd")
+const Windchart = preload("res://scripts/windchart_world.gd")
 const TIDE_CAUSEWAY: Rect2 = Tidepool.CAUSEWAY
 const TIDE_BOUNDS: Rect2 = Tidepool.BOUNDS
 const TIDE_POOLS: Array[Rect2] = Tidepool.POOLS
 const TIDE_REEDS: Rect2 = Tidepool.REEDS
 const RAIN_BOUNDS: Rect2 = Rainstep.BOUNDS
 const RAIN_DOCK: Vector3 = Rainstep.DOCK
+const WIND_BOUNDS: Rect2 = Windchart.BOUNDS
+const WIND_DOCK: Vector3 = Windchart.DOCK
+const WIND_BERTH: Vector3 = Windchart.BERTH
 const HOME_DOCK := Vector3(-13, 0, 4.1)
 const RAIN_PATCH: Rect2 = Rainstep.PATCHES[0]
 const SHORE_MARGIN: float = 0.18
@@ -36,6 +40,7 @@ var battle_pulse: float = 0.0
 var stage: Node3D
 var tidepools: Tidepool
 var rainstep: Rainstep
+var windchart: Windchart
 var battle_biome: String = "meadow"
 var _stage_surfaces: Array[Dictionary] = []
 var _shore_stage_props: Node3D
@@ -58,6 +63,9 @@ func _ready() -> void:
 	rainstep = Rainstep.new()
 	rainstep.build(self)
 	rainstep.root_node.visible = false
+	windchart = Windchart.new()
+	windchart.build(self)
+	windchart.root_node.visible = false
 	_build_stage()
 	player = _person("player", player_position)
 	companion = _sprite(Art.creature(0), player_position + Vector3(0.8, 0.55, 0.6), 0.017)
@@ -461,9 +469,10 @@ func _stage_surface(node: MeshInstance3D, shore_color: Color, texture_kind: Stri
 	_stage_surfaces.append({"node":node, "meadow":node.material_override, "tidepools":_mat(shore_color, texture_kind), "rainstep":_mat(rain_color, texture_kind), "beacon":_mat(beacon_color, texture_kind)})
 
 func set_island(id: String, spawn: Vector3) -> void:
-	island_id = id if id in ["wakeharbor", "rainstep"] else "wakeharbor"
+	island_id = id if id in ["wakeharbor", "rainstep", "windchart"] else "wakeharbor"
 	var arrival := Vector3(spawn.x, 0, spawn.z)
-	player_position = arrival if spawn.is_finite() and can_walk(arrival) else (RAIN_DOCK if island_id == "rainstep" else HOME_DOCK)
+	var safe_position: Vector3 = WIND_DOCK if island_id == "windchart" else (RAIN_DOCK if island_id == "rainstep" else HOME_DOCK)
+	player_position = arrival if spawn.is_finite() and can_walk(arrival) else safe_position
 	moving = false
 	if is_instance_valid(player):
 		player.position = player_position + Vector3(0, 0.81, 0)
@@ -471,12 +480,18 @@ func set_island(id: String, spawn: Vector3) -> void:
 		companion.position = player_position + Vector3(0.65, 0.6, 0.65)
 	if rainstep != null:
 		rainstep.root_node.visible = island_id == "rainstep"
+	if windchart != null:
+		windchart.root_node.visible = island_id == "windchart"
 	_camera_target = _overworld_camera_target()
 	if is_instance_valid(camera):
 		camera.position = _camera_target + Vector3(0, 17, 20)
 		camera.look_at(_camera_target)
 
 func _overworld_camera_target() -> Vector3:
+	if island_id == "windchart":
+		if Windchart.BERTH_BOUNDS.has_point(Vector2(player_position.x, player_position.z)):
+			return Vector3(140, 0, clampf(player_position.z, -1.0, 1.0))
+		return Vector3(clampf(player_position.x, 113, 127), 0, clampf(player_position.z, -7, 7))
 	if island_id == "rainstep":
 		return Vector3(clampf(player_position.x, 53, 67), 0, clampf(player_position.z, -7, 7))
 	var south_limit: float = 21.0 if area_id() == "tidepools" else 6.0
@@ -487,6 +502,8 @@ func can_walk(pos: Vector3) -> bool:
 		return false
 	if island_id == "rainstep":
 		return rainstep != null and rainstep.can_walk(pos)
+	if island_id == "windchart":
+		return windchart != null and windchart.can_walk(pos)
 	var point := Vector2(pos.x, pos.z)
 	var original_island: bool = absf(pos.x) <= 14.5 and absf(pos.z) <= 10.6
 	var tide_shore: bool = TIDE_CAUSEWAY.grow(-SHORE_MARGIN).has_point(point) or TIDE_BOUNDS.grow(-SHORE_MARGIN).has_point(point)
@@ -536,6 +553,8 @@ func is_grass() -> bool:
 	return encounter_region() != ""
 
 func encounter_region() -> String:
+	if island_id == "windchart":
+		return ""
 	if island_id == "rainstep":
 		return "rainstep" if Rainstep.is_encounter_point(player_position) else ""
 	if Tidepool.is_encounter_point(player_position):
@@ -545,6 +564,8 @@ func encounter_region() -> String:
 	return ""
 
 func area_id() -> String:
+	if island_id == "windchart":
+		return "lee_berth" if Windchart.BERTH_BOUNDS.has_point(Vector2(player_position.x, player_position.z)) else "windchart"
 	if island_id == "rainstep":
 		return "rainstep"
 	var point := Vector2(player_position.x, player_position.z)
@@ -562,6 +583,8 @@ func area_name() -> String:
 		"sanctum": return "FIRST LIGHT SANCTUM"
 		"tidepools": return "TIDEGLASS POOLS"
 		"rainstep": return "RAINSTEP TERRACES"
+		"windchart": return "WINDCHART QUAY"
+		"lee_berth": return "LEE BERTH"
 	return "CANDLE REED MEADOW"
 
 func sync_tide_progress(flags: Dictionary) -> void:
@@ -569,6 +592,9 @@ func sync_tide_progress(flags: Dictionary) -> void:
 
 func sync_rain_progress(flags: Dictionary) -> void:
 	rainstep.sync_progress(flags)
+
+func sync_wind_progress(flags: Dictionary) -> void:
+	windchart.sync_progress(flags)
 
 func set_battle(enabled: bool, player_id: int = 0, enemy_id: int = 3, biome: String = "meadow") -> void:
 	in_battle = enabled

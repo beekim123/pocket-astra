@@ -1,6 +1,6 @@
 # 灯潮纪 / Lanternwake — 两盏航灯
 
-一款可从头到尾完成双岛、两章旅程的原创怪兽收集 RPG。使用 **Godot 4.7.2**，美术、像素动画、界面、网格、音乐和音效均由源代码在运行时生成。默认简体中文，可随时切换英文。英文为代码点阵字，中文由代码调用操作系统已有的中文字体绘制；项目不捆绑字体文件。无需插件、导入美术或在编辑器手动配置节点。
+一款可从头到尾完成两章主线与三岸旅程的原创怪兽收集 RPG。使用 **Godot 4.7.2**，美术、像素动画、界面、网格、音乐和音效均由源代码在运行时生成。默认简体中文，可随时切换英文。英文为代码点阵字，中文由代码调用操作系统已有的中文字体绘制；项目不捆绑字体文件。无需插件、导入美术或在编辑器手动配置节点。
 
 源码仓库：<https://github.com/beekim123/pocket-astra>。持续扩展计划见 `docs/design/expansion-roadmap.md`，当前实际完成和推送状态见 `docs/v2/status.md`。
 
@@ -66,6 +66,17 @@
 - 奈里首次胜利给予4个回声瓶与2瓶药剂；道馆首次胜利给予6个回声瓶与3瓶药剂（道具上限999）。回看故事或重复交谈不会重复领奖。
 - 获胜点亮六角集雨航灯，获得第二航灯徽记，观看独立第二章结局。之后可自由往返两岛；与伊莱亚交谈可回看第二结局。
 - 地图和目标栏会随「修水路 → 奈里 → 伊莱亚 → 两灯亮起」更新。两个道馆分别保存完成状态；旧版存档的第二道馆默认未完成。
+
+## 风图埠短航（1.6 / 第 05 轮）
+
+点亮第二航灯后，到雨阶码头东侧找 **玛伦 / Maren**，免费乘船前往 **风图埠 / Windchart Quay**。这是以观察和判断为主的小旅程，没有强制战斗或物资消耗；主港玛伦也提供免费回复补给。
+
+1. 任意顺序观察西北的风标、东侧潮尺和东北的对灯，三条线索会保存到地图笔记。
+2. 回到中央航图台：东侧礁道迎风，北侧浅滩水浅，南侧水道通往背风弯。选择安全航线抵达独立小泊位。选错会解释原因，留在原处立即重试，不扣道具；Esc可取消。
+3. 在 **背风泊位 / Lee Berth** 与制帆人 **赛菈 / Sela** 交谈，点亮靠泊灯，首次获得4个回声瓶、2瓶药剂（总数上限999）。重复拜访不重复发奖。
+4. 南侧小艇免费回风图主港；码头渡船免费回雨阶，再搭原渡船回醒潮港。途中与结尾进度均能保存；静音与六只满队也不会卡住任务。
+
+新增地图标明航标、航图台、回复处、渡船和泊位；已读线索可随时回看。风图埠及泊位由代码生成海面、石堤、木船棚、帆布工具与航灯。现有11种鸣兽、两个道馆和全部旧存档继续兼容。
 
 ## 原创鸣兽
 
@@ -134,6 +145,8 @@ scripts/
   tide_quest.gd          # 可选救援、记录与一次性奖励
   rainstep_world.gd      # 雨阶村落、水渠、渡船、第二航灯与碰撞
   rain_quest.gd          # 航渡门槛、免费回复与任意顺序修复
+  windchart_world.gd     # 程序化风图港口、航标与独立背风泊位
+  wind_quest.gd          # 风图通航、三条线索、航线判断与结尾奖励
   challenge_db.gd       # 四场命名挑战、门槛、队伍与独立奖励
   encounter_tables.gd   # 苇草/潮池/雨阶的稳定地区遭遇表
   game_ui.gd            # 全代码界面、地图、队伍、图鉴
@@ -169,6 +182,9 @@ tests/
   test_challenges.gd   # 四挑战门槛、奖励、旗标、旧档与三种开局平衡
   test_second_light_journey.gd # 真实步行、准备战、第二馆、结局和重载
   test_second_light_localization.gd # 新对白、界面和战报双语覆盖
+  test_wind_rules.gd   # 航标顺序、路线、奖励、旧档与坏档边界
+  test_wind_journey.gd # 实际步行、航渡、错误重试、泊位与返航
+  test_wind_localization.gd # 航海对白、笔记与菜单中英覆盖
   capture_game.gd      # 截图专用协调器，禁用冒险保存
   test_capture_isolation.gd # 验证截图不改变存档或语言偏好
   render_capture.gd    # 实际 GPU 渲染取证，输出至外部路径
@@ -209,14 +225,14 @@ validation_project=$(python3 tools/prepare_validation.py)
   --script tests/render_capture.gd -- world /tmp/lanternwake-world.png
 ```
 
-视图参数还支持 `title`、`starter`、`meadow`、`battle`、`journal`、`ending`、`tidepools`、`shore_map`、`rescue`、`shore_battle`、`rainstep`、`rain_map`、`rain_repair`、`ferry`、`rain_battle`、`journal_rain`、`journal_unknown`、`rillisk_battle`、`terracurl_battle`、`glimveil_battle`、`second_unlit`、`second_beacon`、`second_map`、`neri_battle`、`second_battle`、`second_ending`。输出路径之后可加 `en` 检查英文。截图协调器另行禁用保存，形成第二层隔离。
+视图参数还支持 `title`、`starter`、`meadow`、`battle`、`journal`、`ending`、`tidepools`、`shore_map`、`rescue`、`shore_battle`、`rainstep`、`rain_map`、`rain_repair`、`ferry`、`rain_battle`、`journal_rain`、`journal_unknown`、`rillisk_battle`、`terracurl_battle`、`glimveil_battle`、`second_unlit`、`second_beacon`、`second_map`、`neri_battle`、`second_battle`、`second_ending`、`wind_quay`、`wind_marker`、`wind_route`、`wind_map`、`wind_berth`、`wind_ferry`。输出路径之后可加 `en` 检查英文。截图协调器另行禁用保存，形成第二层隔离。
 
 ## 已知范围与下一阶段
 
-- 当前交付是完整两章、两座岛屿与道馆、浅鸣潮池支线、雨阶水路修复、11种鸣兽及分页图鉴，以及简体中文/英文切换；第三片航区、进化、联网和配音尚未实施。
+- 当前交付是完整两章与两座道馆、浅鸣潮池支线、雨阶水路修复、风图埠短航、11种鸣兽及分页图鉴，以及简体中文/英文切换；第三道馆、进化、联网和配音尚未实施。
 - 全代码美术偏向手工像素和微缩布景，未追求所参考商业作品的美术规模与电影级光照。
 - 技术验证详情以 `docs/v2/status.md` 为准；自动通关与画面检查不等于用户亲自验收，也不是长时间稳定性或所有硬件的兼容性保证。
-- 旧版截图脚本的互动场景曾走真实保存入口，有覆盖默认冒险档的风险。1.3 已改为无保存截图协调器，并让整个验证流程使用独立用户目录。没有历史备份，无法确认或自动恢复此前可能受影响的进度；本轮隔离后现有存档已核对保持字节一致。
-- 已获授权继续扩展，下一轮计划为「风图埠短航」：第三片小港、观察三个航标、选择短航线及安全返航。每轮保持已有旅程可玩，验证后独立提交推送。
+- 旧版截图脚本的互动场景曾走真实保存入口，有覆盖默认冒险档的风险。1.3 已改为无保存截图协调器，并让整个验证流程使用独立用户目录。没有历史备份，无法确认或自动恢复此前可能受影响的进度；1.3隔离修复当轮已核对现有存档保持字节一致，后续验证均使用隔离目录。
+- 已获授权继续扩展，下一轮计划为「旅伴寄养」：增加持久寄养空间与满队捕捉安排，保留六只随行队伍和旧档兼容。每轮保持已有旅程可玩，验证后独立提交推送。
 
 项目内新创作的游戏内容、角色、地名、对白、旋律和图形均为本次原创；不使用参考作品的名称、形象、地图或音乐。Godot 引擎原有程序属于用户提供的开发工具，不属于游戏素材，也不包含在交付 ZIP 中。

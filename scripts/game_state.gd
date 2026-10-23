@@ -7,12 +7,18 @@ const SAVE_VERSION: int = 1
 const PARTY_LIMIT: int = 6
 const HOME_POSITION: Vector3 = Vector3(-7.0, 0.0, 5.0)
 const RAIN_POSITION: Vector3 = Vector3(60.0, 0.0, 8.0)
+const WIND_POSITION: Vector3 = Vector3(120.0, 0.0, 8.0)
+const WIND_BERTH_POSITION: Vector3 = Vector3(140.0, 0.0, 2.0)
+const WIND_RAIN_POSITION: Vector3 = Vector3(64.0, 0.0, 7.0)
+const WIND_BERTH_BOUNDS: Rect2 = Rect2(136.0, -5.0, 8.0, 10.0)
 const FERRY_HOME_POSITION: Vector3 = Vector3(-13.0, 0.0, 4.1)
 const FLAG_KEYS: Array[String] = ["starter", "rival", "gym", "captured"]
 const TIDE_FLAG_KEYS: Array[String] = ["tide_started", "tide_rescued", "tide_rewarded", "tide_wind", "tide_water", "tide_brass"]
 const RAIN_FLAG_KEYS: Array[String] = ["rain_arrived", "rain_started", "rain_upper", "rain_middle", "rain_lower", "rain_rewarded"]
 const RAIN_REPAIR_KEYS: Array[String] = ["rain_upper", "rain_middle", "rain_lower"]
-const OPTIONAL_FLAG_KEYS: Array[String] = ["cache", "tide_started", "tide_rescued", "tide_rewarded", "tide_wind", "tide_water", "tide_brass", "rain_arrived", "rain_started", "rain_upper", "rain_middle", "rain_lower", "rain_rewarded", "rain_trial", "rain_gym"]
+const WIND_FLAG_KEYS: Array[String] = ["wind_arrived", "wind_wind", "wind_tide", "wind_light", "wind_sailed", "wind_rewarded"]
+const WIND_MARKER_KEYS: Array[String] = ["wind_wind", "wind_tide", "wind_light"]
+const OPTIONAL_FLAG_KEYS: Array[String] = ["cache", "tide_started", "tide_rescued", "tide_rewarded", "tide_wind", "tide_water", "tide_brass", "rain_arrived", "rain_started", "rain_upper", "rain_middle", "rain_lower", "rain_rewarded", "rain_trial", "rain_gym", "wind_arrived", "wind_wind", "wind_tide", "wind_light", "wind_sailed", "wind_rewarded"]
 
 var party: Array[Dictionary] = []
 var collection: Array[int] = []
@@ -23,6 +29,8 @@ var flags: Dictionary = {
 	"rain_arrived": false, "rain_started": false, "rain_upper": false,
 	"rain_middle": false, "rain_lower": false, "rain_rewarded": false,
 	"rain_trial": false, "rain_gym": false,
+	"wind_arrived": false, "wind_wind": false, "wind_tide": false,
+	"wind_light": false, "wind_sailed": false, "wind_rewarded": false,
 }
 var orbs: int = 12
 var tonics: int = 5
@@ -44,7 +52,13 @@ func heal_all() -> void:
 
 
 func recovery_position() -> Vector3:
-	return RAIN_POSITION if island_id == "rainstep" else HOME_POSITION
+	match island_id:
+		"rainstep":
+			return RAIN_POSITION
+		"windchart":
+			return WIND_POSITION
+		_:
+			return HOME_POSITION
 
 
 func add_creature(id: int, level: int) -> bool:
@@ -143,7 +157,7 @@ func load_game(path: String = "user://lanternwake.json") -> bool:
 	if data.has("island_id") and not data.island_id is String:
 		return false
 	var new_island_id: String = data.get("island_id", "wakeharbor")
-	if new_island_id not in ["wakeharbor", "rainstep"]:
+	if new_island_id not in ["wakeharbor", "rainstep", "windchart"]:
 		return false
 	var new_flags: Dictionary = {}
 	for key: String in FLAG_KEYS:
@@ -183,6 +197,25 @@ func load_game(path: String = "user://lanternwake.json") -> bool:
 	if bool(new_flags.rain_trial) and not bool(new_flags.rain_rewarded):
 		return false
 	if bool(new_flags.rain_gym) and not bool(new_flags.rain_trial):
+		return false
+	if new_island_id == "windchart" and not bool(new_flags.wind_arrived):
+		return false
+	for key: String in WIND_FLAG_KEYS:
+		if not bool(new_flags[key]):
+			continue
+		if not bool(new_flags.starter) or not bool(new_flags.rain_gym):
+			return false
+		if key != "wind_arrived" and not bool(new_flags.wind_arrived):
+			return false
+	if bool(new_flags.wind_sailed):
+		for key: String in WIND_MARKER_KEYS:
+			if not bool(new_flags[key]):
+				return false
+	if bool(new_flags.wind_rewarded) and not bool(new_flags.wind_sailed):
+		return false
+	# The separate berth has no walking exit; its return boat requires a crossing.
+	var saved_horizontal_position: Vector2 = Vector2(float(data.position[0]), float(data.position[2]))
+	if new_island_id == "windchart" and WIND_BERTH_BOUNDS.has_point(saved_horizontal_position) and not bool(new_flags.wind_sailed):
 		return false
 	var new_collection: Array[int] = []
 	for id: Variant in data.collection:

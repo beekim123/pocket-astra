@@ -6,7 +6,7 @@ const REPAIR_FLAGS: Array[String] = ["rain_upper", "rain_middle", "rain_lower"]
 
 
 static func travel(state: GameState, destination: String) -> bool:
-	if not bool(state.flags.starter) or destination not in ["wakeharbor", "rainstep"] or destination == state.island_id:
+	if state.island_id not in ["wakeharbor", "rainstep"] or not bool(state.flags.starter) or destination not in ["wakeharbor", "rainstep"] or destination == state.island_id:
 		return false
 	if destination == "rainstep" and not bool(state.flags.gym):
 		return false
