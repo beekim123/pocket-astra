@@ -1,0 +1,5 @@
+.godot/
+Godot.app/
+dist/
+*.log
+.DS_Store
