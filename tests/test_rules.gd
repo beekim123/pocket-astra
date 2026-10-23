@@ -44,12 +44,12 @@ func _team(id: int, level: int) -> Array[Dictionary]:
 
 
 func _test_starters_and_types() -> void:
-	for id: int in range(8):
+	for id: int in range(db.SPECIES.size()):
 		var info: Dictionary = db.species(id)
 		_check(info.has_all(["name", "element", "color", "description", "move", "power", "hp", "attack", "defense", "speed"]), "Each species supports rendering and battle stats")
 		var creature: Dictionary = db.make_creature(id, 3)
 		_check(int(creature.hp) > 0 and creature.hp == creature.max_hp, "New creatures are healthy")
-	_check(db.species(-1).is_empty() and db.make_creature(8, 3).is_empty(), "Invalid species do not create phantom creatures")
+	_check(db.species(-1).is_empty() and db.make_creature(db.SPECIES.size(), 3).is_empty(), "Invalid species do not create phantom creatures")
 	_check(db.effectiveness("ember", "grove") > 1.0, "Ember beats grove")
 	_check(db.effectiveness("grove", "tide") > 1.0, "Grove beats tide")
 	_check(db.effectiveness("tide", "ember") > 1.0, "Tide beats ember")

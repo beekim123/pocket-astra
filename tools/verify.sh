@@ -54,6 +54,9 @@ run_check rain_rules --script tests/test_rain_rules.gd
 run_check rain_journey --script tests/test_rain_journey.gd
 run_check rain_journey_english --script tests/test_rain_journey.gd -- en
 run_check rain_localization --script tests/test_rain_localization.gd
+run_check rain_species --script tests/test_rain_species.gd
+run_check species_localization --script tests/test_species_localization.gd
+run_check journal --script tests/test_journal.gd
 run_check capture_isolation --script tests/test_capture_isolation.gd
 run_check startup --quit-after 30
 echo "All sequential checks passed. Logs: $log_dir"

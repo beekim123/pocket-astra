@@ -281,7 +281,7 @@ func _menu() -> void:
 		"journal": _journal_menu()
 		"map": _map_menu()
 		"settings": _settings_menu()
-	_text("VESSELS  %02d     TONICS  %02d     JOURNAL  %02d / 08" % [game.state.orbs, game.state.tonics, game.state.collection.size()], Vector2(71, 654), 1, GOLD)
+	_text("VESSELS  %02d     TONICS  %02d     JOURNAL  %02d / %02d" % [game.state.orbs, game.state.tonics, game.state.collection.size(), DB.SPECIES.size()], Vector2(71, 654), 1, GOLD)
 	_text("TIME  %02d:%02d" % [int(game.state.play_seconds) / 60, int(game.state.play_seconds) % 60], Vector2(1077, 654), 1, MIST)
 
 func _party_menu() -> void:
@@ -307,13 +307,17 @@ func _party_menu() -> void:
 	_button("lead", "SWITCH IN" if game.menu_return == "battle" else "MAKE LEAD COMPANION", Rect2(589, 561, 319, 43), 1)
 	if game.menu_return != "battle":
 		_button("release", "CONFIRM RELEASE" if game.release_pending else "RELEASE", Rect2(925, 561, 260, 43), 1, game.state.party.size() > 1)
-	_text("RELEASING KEEPS ITS JOURNAL ENTRY. FIND IT AGAIN IN THE MEADOW.", Vector2(591, 622), 1, MIST)
+	_text("RELEASING KEEPS ITS JOURNAL ENTRY. FIND IT AGAIN IN ITS HOME REGION.", Vector2(591, 622), 1, MIST)
 
 func _journal_menu() -> void:
 	_text("FIELD JOURNAL", Vector2(73, 166), 2, GOLD)
-	for i in range(8):
-		var x: float = 70 + (i % 4) * 133
-		var y: float = 209 + (i / 4) * 173
+	if game.state.collection.size() == DB.SPECIES.size():
+		_text("COLLECTION COMPLETE", Vector2(337, 169), 1, TEAL)
+	var ids: Array[int] = game.journal_visible_ids()
+	for slot: int in range(ids.size()):
+		var i: int = ids[slot]
+		var x: float = 70 + (slot % 4) * 133
+		var y: float = 209 + (slot / 4) * 173
 		var known: bool = game.state.collection.has(i)
 		_button("journal:%d" % i, "", Rect2(x, y, 120, 157))
 		draw_texture_rect(Art.creature(i), Rect2(x + 5, y + 9, 110, 110), false, Color.WHITE if known else Color(0.15, 0.23, 0.25, 1))
@@ -321,11 +325,20 @@ func _journal_menu() -> void:
 	var id: int = game.journal_id
 	var known: bool = game.state.collection.has(id)
 	var info: Dictionary = DB.species(id)
+	var rain_species: bool = info.get("habitat", "meadow") == "rainstep"
+	var habitat: String = "FOUND IN RAINSTEP" if rain_species else "FOUND IN CANDLE REED"
+	if rain_species:
+		_text("RAINSTEP COMPANIONS", Vector2(73, 193), 1, MIST)
 	draw_texture_rect(Art.creature(id, int(game.clock * 2) % 3), Rect2(795, 155, 224, 224), false, Color.WHITE if known else Color(0.15, 0.23, 0.25, 1))
 	_center(info.name if known else "UNRECORDED SONG", Vector2(910, 399), 3, CREAM)
-	_center(str(info.element).to_upper() if known else "A VOICE IN CANDLE REED", Vector2(910, 441), 1, GOLD)
-	_paragraph(info.description if known else "Explore the tall reeds beyond the bridge. Every new friendship writes a page in this journal.", Vector2(660, 477), 43, 2, MIST)
-	_text("RECORDED" if known else "NOT YET BEFRIENDED", Vector2(662, 594), 1, TEAL if known else GOLD)
+	_center(str(info.element).to_upper() if known else habitat, Vector2(910, 441), 1, GOLD)
+	var discovery: String = "Three new resonants shelter by Rainstep's channels, warm stones, and roof eaves. Look among the pale plants, then weaken them before capture." if rain_species else "Explore the tall reeds beyond the bridge. Every new friendship writes a page in this journal."
+	_paragraph(info.description if known else discovery, Vector2(660, 477), 43, 2, MIST)
+	_text(habitat, Vector2(662, 588), 1, MIST)
+	_text("RECORDED" if known else "NOT YET BEFRIENDED", Vector2(662, 613), 1, TEAL if known else GOLD)
+	_button("journal_previous", "PREVIOUS PAGE", Rect2(70, 574, 144, 37), 1, game.journal_page > 0)
+	_button("journal_next", "NEXT PAGE", Rect2(232, 574, 144, 37), 1, game.journal_page + 1 < game.journal_page_count())
+	_center("PAGE %d / %d" % [game.journal_page + 1, game.journal_page_count()], Vector2(493, 587), 1, GOLD)
 
 func _map_menu() -> void:
 	_button("map_island", "ISLAND MAP", Rect2(74, 151, 155, 22), 1)

@@ -12,6 +12,9 @@ const SPECIES: Array[Dictionary] = [
 	{"name": "Reedrill", "element": "grove", "color": Color(0.32, 0.71, 0.59), "description": "A marsh heron that carves quiet paths through tall reeds.", "move": "Reed Lance", "power": 17, "hp": 25, "attack": 12, "defense": 9, "speed": 14},
 	{"name": "Voltkite", "element": "storm", "color": Color(0.70, 0.62, 1.0), "description": "An airborne ray riding the sparks between passing clouds.", "move": "Cloudspark", "power": 18, "hp": 27, "attack": 13, "defense": 9, "speed": 16},
 	{"name": "Noctulume", "element": "shade", "color": Color(0.48, 0.42, 0.69), "description": "A watchful night owl guarding the last light of the valley.", "move": "Velvet Eclipse", "power": 18, "hp": 31, "attack": 12, "defense": 12, "speed": 11},
+	{"name": "Rillisk", "element": "tide", "color": Color(0.23, 0.72, 0.68), "description": "A nimble gutter lizard that guides stray drops toward thirsty roots.", "move": "Gutter Glide", "power": 18, "hp": 26, "attack": 12, "defense": 9, "speed": 15, "habitat": "rainstep"},
+	{"name": "Terracurl", "element": "stone", "color": Color(0.68, 0.49, 0.58), "description": "Its stepped shell stores the warmth of old stone paths after the rain.", "move": "Terrace Tumble", "power": 18, "hp": 34, "attack": 10, "defense": 16, "speed": 5, "habitat": "rainstep"},
+	{"name": "Glimveil", "element": "glow", "color": Color(1.0, 0.75, 0.48), "description": "It folds luminous wings like a curtain, guiding late walkers beneath the eaves.", "move": "Eaves Gleam", "power": 18, "hp": 25, "attack": 12, "defense": 8, "speed": 16, "habitat": "rainstep"},
 ]
 const ADVANTAGES: Dictionary = {
 	"ember": ["grove"],

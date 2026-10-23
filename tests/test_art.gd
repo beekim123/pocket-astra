@@ -3,6 +3,7 @@ extends SceneTree
 ## Run centrally: godot --headless --path . --script tests/test_art.gd
 
 const Art = preload("res://scripts/art.gd")
+const DB = preload("res://scripts/creature_db.gd")
 const FontArt = preload("res://scripts/pixel_font.gd")
 var checks: int = 0
 var failures: int = 0
@@ -12,6 +13,7 @@ func _initialize() -> void:
 	# This suite characterizes the original ASCII glyph contract independently.
 	preload("res://scripts/localization.gd").set_language("en")
 	_test_creatures()
+	_test_rainstep_creatures()
 	_test_people()
 	_test_ground()
 	_test_foliage()
@@ -43,7 +45,7 @@ func _signature(texture: Texture2D, expected: Vector2i, label: String) -> String
 
 func _test_creatures() -> void:
 	var signatures: Dictionary = {}
-	for id: int in range(8):
+	for id: int in range(DB.SPECIES.size()):
 		for frame: int in range(3):
 			for back: bool in [false, true]:
 				var label: String = "Creature %d frame %d rear %s" % [id, frame, back]
@@ -54,7 +56,35 @@ func _test_creatures() -> void:
 				if not signature.is_empty():
 					_check(not signatures.has(signature), label + " differs from every other species, frame, and direction")
 					signatures[signature] = label
-	_check(signatures.size() == 48, "All eight species have three distinct front and rear views")
+	_check(signatures.size() == DB.SPECIES.size() * 6, "Every catalog species has three distinct front and rear views")
+	_check(Art.creature(DB.SPECIES.size()) == Art.creature(0), "Species wrapping follows the catalog count")
+	_check(Art.creature(-1) == Art.creature(DB.SPECIES.size() - 1), "Negative species wrapping uses the last catalog entry")
+
+
+func _test_rainstep_creatures() -> void:
+	var original_signatures: Dictionary = {}
+	for id: int in range(8):
+		original_signatures[Art.creature(id).get_image().get_data().hex_encode().sha256_text()] = true
+	_check(DB.SPECIES.size() >= 11, "The three Rainstep species are present in the catalog")
+	for id: int in range(8, 11):
+		var signature: String = Art.creature(id).get_image().get_data().hex_encode().sha256_text()
+		_check(not original_signatures.has(signature), "Rainstep species %d has original art rather than aliasing an existing species" % id)
+		for back: bool in [false, true]:
+			var silhouette_signatures: Dictionary = {}
+			for frame: int in range(3):
+				var image: Image = Art.creature(id, frame, back).get_image()
+				var bounds: Rect2i = image.get_used_rect()
+				_check(bounds.position.x > 0 and bounds.position.y > 0 and bounds.end.x < 80 and bounds.end.y < 80, "Rainstep species %d frame %d rear %s keeps a transparent canvas margin" % [id, frame, back])
+				# A normalized silhouette ignores global bobbing, colors, and blinking.
+				# Distinct poses must actually move the tail, stalks, feet, or wings.
+				var silhouette: Image = image.get_region(bounds)
+				for y: int in range(silhouette.get_height()):
+					for x: int in range(silhouette.get_width()):
+						if silhouette.get_pixel(x, y).a > 0.0:
+							silhouette.set_pixel(x, y, Color.WHITE)
+				var shape: String = str(bounds.size) + silhouette.get_data().hex_encode().sha256_text()
+				_check(not silhouette_signatures.has(shape), "Rainstep species %d frame %d rear %s animates its shape beyond whole-frame bobbing" % [id, frame, back])
+				silhouette_signatures[shape] = true
 
 
 func _test_people() -> void:

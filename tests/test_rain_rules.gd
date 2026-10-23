@@ -338,21 +338,21 @@ func _test_regional_encounters() -> void:
 	first.seed = 32791
 	second.seed = 32791
 	var species: Array[int] = encounter_script.species_for("rainstep")
-	for id: int in [1, 2, 5, 6, 7]:
-		_check(species.has(id), "Rainstep uses the established species " + str(id))
+	for id: int in [1, 2, 5, 6, 7, 8, 9, 10]:
+		_check(species.has(id), "Rainstep includes its regional species " + str(id))
 	for id: int in species:
-		_check([1, 2, 5, 6, 7].has(id), "The Rainstep table excludes unrelated meadow species")
+		_check([1, 2, 5, 6, 7, 8, 9, 10].has(id), "The Rainstep table excludes unrelated meadow species")
 	var seen: Dictionary = {}
 	var lowest: int = 99
 	var highest: int = 0
 	for unused: int in range(180):
 		var encounter: Dictionary = encounter_script.roll("rainstep", first, false, false)
 		_check(encounter == encounter_script.roll("rainstep", second, false, false), "Seeded Rainstep encounters are deterministic")
-		_check([1, 2, 5, 6, 7].has(int(encounter.id)) and int(encounter.level) >= 5 and int(encounter.level) <= 7, "Rainstep encounters stay within existing species and levels five to seven")
+		_check([1, 2, 5, 6, 7, 8, 9, 10].has(int(encounter.id)) and int(encounter.level) >= 5 and int(encounter.level) <= 7, "Rainstep encounters stay within regional species and levels five to seven")
 		seen[int(encounter.id)] = true
 		lowest = mini(lowest, int(encounter.level))
 		highest = maxi(highest, int(encounter.level))
-	_check(seen.size() == 5 and lowest == 5 and highest == 7, "A fixed Rainstep route reaches every species and both level bounds")
+	_check(seen.size() == 8 and lowest == 5 and highest == 7, "A fixed Rainstep route reaches every species and both level bounds")
 	for region: String in ["rainstep", "meadow", "tidepools", "unknown"]:
 		_check(encounter_script.roll(region, first, true, true) == {"id": 3, "level": 3}, "First-catch teaching is unchanged in " + region)
 	first.seed = 879

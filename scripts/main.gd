@@ -12,6 +12,7 @@ const Preferences = preload("res://scripts/preferences.gd")
 const ShoreQuest = preload("res://scripts/tide_quest.gd")
 const Encounters = preload("res://scripts/encounter_tables.gd")
 const RainStory = preload("res://scripts/rain_quest.gd")
+const Journal = preload("res://scripts/field_journal.gd")
 
 var state: GameState = State.new()
 var world: LanternWorld
@@ -28,6 +29,7 @@ var battle_region: String = "meadow"
 var selection: int = 0
 var chosen_creature: int = 0
 var journal_id: int = 0
+var journal_page: int = 0
 var release_pending: bool = false
 var has_save: bool = false
 var dialogue: Array[String] = []
@@ -163,6 +165,9 @@ func _input(event: InputEvent) -> void:
 	if not event is InputEventKey or not event.pressed or event.echo:
 		return
 	var key: int = event.physical_keycode
+	if mode == "menu" and menu_tab == "journal" and key in [KEY_PAGEUP, KEY_PAGEDOWN]:
+		_change_journal_page(-1 if key == KEY_PAGEUP else 1)
+		return
 	if key == KEY_L:
 		handle_action("language")
 		return
@@ -254,9 +259,19 @@ func handle_action(action: String) -> void:
 		release_pending = false
 		return
 	if action.begins_with("journal:"):
-		journal_id = int(action.get_slice(":", 1))
+		var raw_id: String = action.get_slice(":", 1)
+		if not raw_id.is_valid_int():
+			return
+		var requested_id: int = int(raw_id)
+		if requested_id < 0 or requested_id >= DB.SPECIES.size():
+			return
+		journal_id = requested_id
+		journal_page = floori(float(journal_id) / Journal.PAGE_SIZE)
+		selection = 5 + journal_id % Journal.PAGE_SIZE
 		return
 	match action:
+		"journal_previous": _change_journal_page(-1)
+		"journal_next": _change_journal_page(1)
 		"map_shore":
 			map_shore = true
 			map_rain = false
@@ -333,7 +348,7 @@ func handle_action(action: String) -> void:
 				release_pending = false
 				world.companion_id = int(state.active().id)
 				_save(false)
-				notify("RELEASED TO THE MEADOW. JOURNAL ENTRY KEPT.")
+				notify("RELEASED TO ITS HOME REGION. JOURNAL ENTRY KEPT.")
 		"strike", "skill", "guard", "capture", "tonic", "flee": _perform(action)
 		"switch":
 			if mode == "battle" and not battle.finished and battle_queue.is_empty() and battle_timer <= 0:
@@ -348,6 +363,8 @@ func handle_action(action: String) -> void:
 
 func _new_game() -> void:
 	state = State.new()
+	journal_id = 0
+	journal_page = 0
 	world.set_island("wakeharbor", State.HOME_POSITION)
 	world.companion_id = -1
 	world.sync_tide_progress(state.flags)
@@ -412,6 +429,8 @@ func interact() -> void:
 		return
 	if str(npc.role).begins_with("rain_"):
 		var event: Dictionary = RainStory.interact(state, str(npc.role))
+		if str(npc.role) == "rain_keeper":
+			event.lines.append("Three new resonants shelter by Rainstep's channels, warm stones, and roof eaves. Look among the pale plants, then weaken them before capture.")
 		if bool(event.changed):
 			world.sync_rain_progress(state.flags)
 			_save(false)
@@ -447,7 +466,7 @@ func interact() -> void:
 				say(npc.name, ["Two sparks already? Then let's see how they move together. I'll give your team a quick rest before we begin."], func(): state.heal_all(); start_battle("trainer", [DB.make_creature(4, 4), DB.make_creature(5, 5)]))
 		"keeper":
 			if bool(state.flags.gym):
-				say(npc.name, ["Look beyond the mist. That is a sea-lane, shining again. The First Light crest belongs to you.", "There are eight resonants on this island. Your field journal remembers every friendship, even after a release."])
+				say(npc.name, ["Look beyond the mist. That is a sea-lane, shining again. The First Light crest belongs to you.", "The world holds %d kinds of resonants now. Your field journal remembers every friendship, even after a release." % DB.SPECIES.size()])
 			elif not bool(state.flags.captured) or not bool(state.flags.rival):
 				say(npc.name, ["The First Light trial asks for trust and practice. Befriend one wild resonant, then earn Ivo's respect at the bridge.", "Return with those two experiences, and we will wake this tower together."])
 			else:
@@ -566,6 +585,25 @@ func _open_menu(tab: String) -> void:
 	selection = ["party", "journal", "map", "settings"].find(tab)
 	chosen_creature = 0
 	release_pending = false
+	journal_id = clampi(journal_id, 0, DB.SPECIES.size() - 1)
+	journal_page = floori(float(journal_id) / Journal.PAGE_SIZE)
+
+func journal_visible_ids() -> Array[int]:
+	return Journal.ids_on_page(journal_page, DB.SPECIES.size())
+
+func journal_page_count() -> int:
+	return Journal.page_count(DB.SPECIES.size())
+
+func _change_journal_page(direction: int) -> void:
+	if mode != "menu" or menu_tab != "journal":
+		return
+	var next_page: int = clampi(journal_page + direction, 0, journal_page_count() - 1)
+	if next_page == journal_page:
+		return
+	journal_page = next_page
+	journal_id = journal_visible_ids()[0]
+	selection = 5
+	music.sfx("confirm")
 
 func _save(show_message: bool) -> void:
 	if not bool(state.flags.starter):

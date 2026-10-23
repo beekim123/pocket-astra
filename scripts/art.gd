@@ -3,6 +3,7 @@ extends RefCounted
 ## Hand-painted pixel clusters generated once, then kept as shared textures.
 ## All artwork is original and lives in this source file.
 
+const DB = preload("res://scripts/creature_db.gd")
 const INK: Color = Color("202433")
 const CREAM: Color = Color("fff1cf")
 const GOLD: Color = Color("f5cf79")
@@ -10,7 +11,7 @@ static var _textures: Dictionary = {}
 
 
 static func creature(id: int, frame: int = 0, back: bool = false) -> Texture2D:
-	var species: int = posmod(id, 8)
+	var species: int = posmod(id, DB.SPECIES.size())
 	var pose: int = posmod(frame, 3)
 	var key: String = "creature_%d_%d_%s" % [species, pose, back]
 	if _textures.has(key):
@@ -25,6 +26,9 @@ static func creature(id: int, frame: int = 0, back: bool = false) -> Texture2D:
 		5: _reedrill(art, pose, back)
 		6: _voltkite(art, pose, back)
 		7: _noctulume(art, pose, back)
+		8: _rillisk(art, pose, back)
+		9: _terracurl(art, pose, back)
+		10: _glimveil(art, pose, back)
 	_outline(art)
 	if back:
 		art.flip_x()
@@ -601,6 +605,233 @@ static func _noctulume(art: Image, frame: int, back: bool) -> void:
 		_poly(art, [37, 39, 42, 39, 40, 45], GOLD)
 	for feather: Vector2i in [Vector2i(34, 49), Vector2i(43, 49), Vector2i(38, 55)]:
 		_poly(art, [feather.x, feather.y, feather.x + 3, feather.y + 2, feather.x + 6, feather.y, feather.x + 3, feather.y + 5], glow)
+
+
+static func _rillisk(art: Image, frame: int, back: bool) -> void:
+	var shadow: Color = Color("35586c")
+	var teal: Color = Color("489c9c")
+	var light: Color = Color("80cebc")
+	var copper: Color = Color("bb7658")
+	var copper_light: Color = Color("efb87a")
+	var sway: int = -3 if frame == 1 else (3 if frame == 2 else 0)
+	var step: int = -2 if frame == 1 else (2 if frame == 2 else 0)
+	# The tail curls into an open rain channel; its inner rim catches the light.
+	_poly(art, [47, 50, 57, 51, 66, 45 + sway, 69, 37 + sway,
+		66, 32 + sway, 61, 32 + sway, 61, 27 + sway, 66, 25 + sway,
+		73, 30 + sway, 75, 39 + sway, 71, 49 + sway, 61, 57, 49, 58], shadow)
+	_poly(art, [50, 51, 59, 52, 68, 45 + sway, 71, 37 + sway,
+		68, 30 + sway, 64, 29 + sway, 65, 27 + sway, 71, 31 + sway,
+		73, 39 + sway, 69, 48 + sway, 60, 55, 51, 56], teal)
+	_poly(art, [54, 51, 61, 50, 66, 45 + sway, 69, 37 + sway,
+		66, 32 + sway, 63, 32 + sway, 63, 30 + sway, 68, 31 + sway,
+		71, 37 + sway, 68, 46 + sway, 61, 52, 55, 54], light)
+	_rect(art, 63, 27 + sway, 4, 2, copper_light)
+	# Far feet remain separate from the two larger foreground feet.
+	_poly(art, [26, 43, 22, 50, 15 - step, 52, 14 - step, 55,
+		23, 55, 30, 48], shadow)
+	_poly(art, [44, 43, 51, 47, 57 + step, 48, 60 + step, 52,
+		52, 54, 44, 50], shadow)
+	_rect(art, 15 - step, 53, 5, 1, light)
+	_rect(art, 55 + step, 50, 5, 1, light)
+	_poly(art, [25, 39, 35, 36, 46, 39, 54, 45, 56, 53,
+		49, 59, 36, 60, 25, 54, 21, 46], shadow)
+	_poly(art, [26, 40, 35, 38, 45, 41, 51, 46, 52, 52,
+		46, 56, 35, 56, 26, 51, 24, 45], teal)
+	_poly(art, [30, 40, 36, 39, 46, 43, 45, 47, 36, 45, 28, 46], light)
+	_poly(art, [28, 50, 36, 53, 47, 52, 48, 55, 37, 57, 29, 54], CREAM)
+	_poly(art, [42, 53, 48, 51, 51 + step, 58, 58 + step, 62,
+		57 + step, 66, 48 + step, 65, 44, 60], shadow)
+	_poly(art, [44, 54, 48, 54, 49 + step, 60, 55 + step, 63,
+		49 + step, 63, 46, 59], teal)
+	_poly(art, [23, 49, 28, 51, 25 - step, 60, 27 - step, 65,
+		22 - step, 68, 12 - step, 66, 13 - step, 62, 19, 59], shadow)
+	_poly(art, [23, 52, 25, 53, 22 - step, 61, 24 - step, 65,
+		16 - step, 64, 16 - step, 62, 21, 60], teal)
+	_rect(art, 15 - step, 65, 2, 2, CREAM)
+	_rect(art, 20 - step, 66, 2, 1, CREAM)
+	_rect(art, 50 + step, 64, 2, 2, CREAM)
+	_rect(art, 55 + step, 64, 2, 2, CREAM)
+	# Three copper droplets form an ordered ridge, like small gutter brackets.
+	for plate: Vector2i in [Vector2i(33, 31), Vector2i(42, 34), Vector2i(50, 39)]:
+		_poly(art, [plate.x, plate.y, plate.x + 4, plate.y + 4,
+			plate.x + 4, plate.y + 8, plate.x, plate.y + 10,
+			plate.x - 3, plate.y + 7, plate.x - 2, plate.y + 4], copper)
+		_poly(art, [plate.x, plate.y + 2, plate.x + 2, plate.y + 5,
+			plate.x + 1, plate.y + 7, plate.x - 1, plate.y + 6], copper_light)
+	_poly(art, [10, 35, 15, 29, 25, 28, 32, 32, 35, 42,
+		30, 51, 19, 54, 10, 50, 6, 44], shadow)
+	_poly(art, [11, 35, 17, 31, 25, 30, 30, 33, 32, 41,
+		27, 48, 18, 50, 10, 46, 8, 42], teal)
+	_poly(art, [13, 34, 19, 31, 25, 32, 22, 35, 14, 37], light)
+	if back:
+		_poly(art, [17, 38, 24, 35, 30, 40, 28, 47, 21, 49, 16, 44], shadow)
+		_poly(art, [13, 42, 17, 40, 20, 44, 18, 48, 13, 47], light)
+		_line(art, 22, 39, 26, 41, teal, 2)
+	else:
+		_poly(art, [9, 43, 15, 40, 22, 42, 30, 40, 30, 47,
+			24, 51, 16, 51, 9, 47], CREAM)
+		_ellipse(art, 10, 35, 8, 10, CREAM)
+		_ellipse(art, 24, 33, 8, 10, CREAM)
+		_eye(art, 12, 37, frame, teal)
+		_eye(art, 26, 35, frame, teal)
+		_rect(art, 10, 45, 2, 1, shadow)
+		_line(art, 17, 47, 22, 48, shadow)
+		_rect(art, 22, 46, 2, 2, shadow)
+		_rect(art, 26, 45, 3, 2, copper_light)
+
+
+static func _terracurl(art: Image, frame: int, back: bool) -> void:
+	var shadow: Color = Color("66506e")
+	var mauve: Color = Color("ad7d95")
+	var light: Color = Color("d7a3ad")
+	var clay_dark: Color = Color("824f53")
+	var clay: Color = Color("bc765c")
+	var clay_light: Color = Color("e6a778")
+	var sand: Color = Color("f5c993")
+	var sway: int = -2 if frame == 1 else (2 if frame == 2 else 0)
+	# A wide rippling foot keeps this a soft, low snail beneath its heavy shell.
+	_poly(art, [13, 55, 25, 51, 43, 52, 57, 56, 65, 61,
+		71 + sway, 62, 70 + sway, 65, 60, 68, 42, 69, 24, 67,
+		12, 64, 7, 60], shadow)
+	_poly(art, [14, 55, 25, 54, 44, 55, 57, 59, 66, 63,
+		61, 65, 43, 66, 26, 64, 15, 63, 10, 60], mauve)
+	_poly(art, [18, 57, 29, 58, 39, 60, 53, 60, 61, 63,
+		44, 63, 30, 62, 20, 61], light)
+	_line(art, 26 + sway, 64, 35 + sway, 65, CREAM)
+	_line(art, 46 - sway, 66, 56 - sway, 65, light)
+	# Stepped terraces catch top-left light; the right faces keep their depth.
+	_poly(art, [27, 30, 33, 30, 33, 22, 45, 22, 45, 17,
+		58, 17, 58, 21, 65, 21, 65, 28, 70, 28, 70, 47,
+		65, 47, 65, 54, 56, 59, 39, 58, 29, 51], clay_dark)
+	_poly(art, [29, 31, 35, 31, 35, 24, 47, 24, 47, 19,
+		57, 19, 63, 24, 63, 48, 56, 55, 39, 55, 29, 49], clay)
+	_poly(art, [35, 24, 47, 24, 47, 19, 56, 19, 61, 23,
+		50, 23, 50, 27, 39, 27, 39, 33, 30, 35, 30, 31, 35, 31], clay_light)
+	_rect(art, 48, 19, 8, 2, sand)
+	_rect(art, 36, 24, 10, 2, sand)
+	_rect(art, 30, 31, 7, 2, sand)
+	_poly(art, [64, 27, 68, 30, 68, 45, 63, 46, 63, 51,
+		57, 55, 57, 50, 61, 46, 61, 28], Color("a36658"))
+	_line(art, 65, 32, 67, 32, clay_light)
+	_line(art, 65, 40, 67, 40, clay_light)
+	# One continuous square spiral reads as shell growth, not loose brickwork.
+	_line(art, 35, 48, 54, 48, clay_dark, 3)
+	_line(art, 54, 48, 54, 31, clay_dark, 3)
+	_line(art, 54, 31, 38, 31, clay_dark, 3)
+	_line(art, 38, 31, 38, 41, clay_dark, 3)
+	_line(art, 38, 41, 47, 41, clay_dark, 3)
+	_line(art, 47, 41, 47, 36, clay_dark, 3)
+	_line(art, 36, 46, 52, 46, sand)
+	_line(art, 52, 33, 52, 46, clay_light)
+	_line(art, 40, 29, 54, 29, sand)
+	_line(art, 41, 34, 41, 39, clay_light)
+	_rect(art, 43, 37, 3, 2, sand)
+	if back:
+		_poly(art, [28, 37, 33, 36, 33, 45, 39, 50, 39, 55,
+			30, 50, 27, 44], clay_dark)
+		_line(art, 31, 38, 31, 45, clay_light)
+		_rect(art, 58, 24, 2, 4, sand)
+	# Stalks sway independently of the stationary shell and soft foot.
+	_line(art, 17, 50, 12 + sway, 36, shadow, 4)
+	_line(art, 18, 48, 13 + sway, 36, mauve, 2)
+	_line(art, 27, 48, 27 - sway, 32, shadow, 4)
+	_line(art, 28, 46, 28 - sway, 32, light, 2)
+	_ellipse(art, 8 + sway, 29, 10, 10, clay_dark)
+	_ellipse(art, 9 + sway, 29, 8, 8, GOLD)
+	_ellipse(art, 23 - sway, 25, 10, 10, clay_dark)
+	_ellipse(art, 24 - sway, 25, 8, 8, GOLD)
+	_poly(art, [12, 46, 19, 42, 28, 43, 34, 49, 34, 57,
+		28, 62, 17, 62, 10, 57, 8, 51], shadow)
+	_poly(art, [13, 47, 20, 44, 28, 46, 31, 51, 30, 57,
+		25, 60, 17, 59, 11, 55, 10, 51], mauve)
+	_poly(art, [13, 48, 20, 46, 26, 48, 24, 51, 16, 51], light)
+	if back:
+		_rect(art, 11 + sway, 30, 4, 2, sand)
+		_rect(art, 26 - sway, 26, 4, 2, sand)
+		_poly(art, [18, 51, 24, 49, 29, 52, 27, 57, 20, 58, 16, 55], shadow)
+		_line(art, 19, 53, 23, 52, mauve, 2)
+	else:
+		_eye(art, 11 + sway, 31, frame, clay)
+		_eye(art, 26 - sway, 27, frame, clay)
+		_poly(art, [13, 54, 19, 53, 27, 54, 26, 58, 19, 59, 14, 57], Color("ebc3b9"))
+		_line(art, 18, 55, 21, 56, shadow)
+		_line(art, 21, 56, 25, 54, shadow)
+		_rect(art, 11, 52, 3, 2, clay_light)
+		_rect(art, 28, 51, 3, 2, clay_light)
+
+
+static func _glimveil(art: Image, frame: int, back: bool) -> void:
+	var shadow: Color = Color("493d59")
+	var plum: Color = Color("75607f")
+	var fur_light: Color = Color("a58a9d")
+	var membrane_shadow: Color = Color("b77377")
+	var peach: Color = Color("e6aa8b") if not back else Color("cf8d84")
+	var glow: Color = Color("f8d29d") if not back else Color("eab58c")
+	var lift: int = -5 if frame == 1 else (5 if frame == 2 else 0)
+	# Long scalloped membranes hang like lit curtains between the wing fingers.
+	_poly(art, [33, 35, 25, 30, 17, 22 + lift, 12, 23 + lift,
+		7, 33 + lift, 4, 50 + lift, 12, 45 + lift, 17, 58 + lift,
+		23, 50 + lift, 29, 56, 35, 47], shadow)
+	_poly(art, [31, 37, 24, 33, 16, 26 + lift, 13, 27 + lift,
+		10, 35 + lift, 7, 45 + lift, 13, 42 + lift, 18, 53 + lift,
+		23, 46 + lift, 28, 51, 32, 45], membrane_shadow)
+	_poly(art, [30, 37, 24, 35, 16, 27 + lift, 13, 29 + lift,
+		10, 37 + lift, 9, 42 + lift, 14, 40 + lift, 18, 49 + lift,
+		23, 43 + lift, 28, 47, 31, 43], peach)
+	_poly(art, [47, 35, 55, 30, 63, 22 + lift, 68, 23 + lift,
+		73, 33 + lift, 76, 50 + lift, 68, 45 + lift, 63, 58 + lift,
+		57, 50 + lift, 51, 56, 45, 47], shadow)
+	_poly(art, [49, 37, 56, 33, 64, 26 + lift, 67, 27 + lift,
+		70, 35 + lift, 73, 45 + lift, 67, 42 + lift, 62, 53 + lift,
+		57, 46 + lift, 52, 51, 48, 45], membrane_shadow)
+	_poly(art, [50, 37, 56, 35, 64, 27 + lift, 67, 29 + lift,
+		70, 37 + lift, 71, 42 + lift, 66, 40 + lift, 62, 49 + lift,
+		57, 43 + lift, 52, 47, 49, 43], peach)
+	_line(art, 14, 27 + lift, 8, 44 + lift, glow, 2)
+	_line(art, 17, 29 + lift, 18, 50 + lift, glow, 2)
+	_line(art, 24, 35, 24, 45 + lift, glow, 2)
+	_line(art, 66, 27 + lift, 72, 44 + lift, glow, 2)
+	_line(art, 63, 29 + lift, 62, 50 + lift, glow, 2)
+	_line(art, 56, 35, 56, 45 + lift, glow, 2)
+	_rect(art, 16, 52 + lift, 3, 2, GOLD)
+	_rect(art, 61, 52 + lift, 3, 2, GOLD)
+	# The small feet and short central tail stay visible beneath the folded fur.
+	_poly(art, [35, 55, 33, 63, 36, 66, 39, 61, 41, 65,
+		44, 62, 48, 65, 48, 59, 44, 54], shadow)
+	_rect(art, 34, 63, 3, 2, GOLD)
+	_rect(art, 45, 62, 3, 2, GOLD)
+	_poly(art, [32, 39, 39, 36, 47, 40, 51, 49, 48, 57,
+		41, 61, 33, 57, 29, 49], shadow)
+	_poly(art, [33, 40, 40, 39, 46, 42, 48, 50, 45, 56,
+		40, 58, 34, 54, 32, 48], plum)
+	_poly(art, [35, 44, 40, 42, 45, 45, 45, 51, 41, 55,
+		36, 52, 34, 48], fur_light)
+	_poly(art, [33, 28, 29, 23, 29, 16, 33, 19, 37, 28], shadow)
+	_poly(art, [43, 27, 47, 19, 51, 16, 51, 24, 48, 30], shadow)
+	_poly(art, [31, 20, 34, 24, 34, 27, 31, 24], peach)
+	_poly(art, [48, 21, 49, 20, 49, 24, 46, 27], peach)
+	_poly(art, [30, 27, 37, 24, 44, 25, 50, 29, 53, 36,
+		50, 43, 43, 47, 34, 46, 28, 41, 26, 34], shadow)
+	_poly(art, [31, 28, 37, 26, 44, 27, 48, 30, 50, 36,
+		47, 42, 41, 44, 34, 43, 29, 39, 28, 34], plum)
+	_poly(art, [32, 28, 37, 26, 43, 28, 40, 31, 33, 32], fur_light)
+	if back:
+		_poly(art, [32, 33, 38, 30, 46, 33, 48, 38, 43, 42,
+			35, 41, 30, 37], shadow)
+		_poly(art, [35, 32, 38, 31, 43, 33, 40, 35, 36, 35], fur_light)
+		_poly(art, [36, 45, 40, 47, 45, 45, 44, 51, 40, 53, 36, 50], glow)
+	else:
+		_poly(art, [29, 34, 34, 32, 39, 35, 44, 32, 49, 34,
+			48, 40, 43, 44, 35, 43, 30, 39], glow)
+		_poly(art, [31, 35, 35, 34, 39, 37, 44, 34, 47, 35,
+			46, 40, 41, 42, 35, 41], CREAM)
+		_eye(art, 31, 34, frame, membrane_shadow)
+		_eye(art, 44, 34, frame, membrane_shadow)
+		_poly(art, [37, 38, 41, 38, 39, 40], membrane_shadow)
+		_rect(art, 37, 41, 5, 1, shadow)
+		_rect(art, 31, 40, 3, 2, peach)
+		_rect(art, 46, 40, 3, 2, peach)
+		_poly(art, [35, 47, 40, 49, 46, 47, 44, 52, 40, 54, 36, 51], glow)
 
 
 static func _eye(art: Image, x: int, y: int, frame: int, iris: Color) -> void:

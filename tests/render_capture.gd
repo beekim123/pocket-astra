@@ -44,8 +44,29 @@ func _run() -> void:
 			game.battle_timer = 0
 		"journal":
 			game.state.choose_starter(0)
-			game.state.collection.assign([0,1,2,3,4,5,6,7])
+			game.state.collection.assign(range(DB.SPECIES.size()))
 			game._open_menu("journal")
+		"journal_rain", "journal_unknown":
+			game.state.choose_starter(0)
+			if view == "journal_rain":
+				game.state.collection.assign(range(DB.SPECIES.size()))
+			game._open_menu("journal")
+			game.handle_action("journal_next")
+			game.handle_action("journal:10")
+		"rillisk_battle", "terracurl_battle", "glimveil_battle":
+			game.state.choose_starter(0)
+			game.state.flags.captured = true
+			game.state.flags.rival = true
+			game.state.flags.gym = true
+			game.state.flags.rain_arrived = true
+			game.state.island_id = "rainstep"
+			game.world.set_island("rainstep", Vector3(66, 0, 4.7))
+			var species_id: int = {"rillisk_battle":8, "terracurl_battle":9, "glimveil_battle":10}[view]
+			game.state.party[0] = DB.make_creature(8 + (species_id - 7) % 3, 7)
+			game.start_battle("wild", [DB.make_creature(species_id, 6)])
+			game.battle_queue.clear()
+			game.battle_lines.assign(game.battle.log)
+			game.battle_timer = 0
 		"settings": game._open_menu("settings")
 		"rainstep", "rain_map", "rain_repair", "rain_battle", "ferry":
 			game.state.choose_starter(2)

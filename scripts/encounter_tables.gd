@@ -4,7 +4,7 @@ extends RefCounted
 
 const MEADOW: Array[int] = [3, 4, 5, 3, 4, 5, 0, 1, 2, 6, 7]
 const SHORE: Array[int] = [1, 1, 1, 1, 4, 4, 4, 3, 3]
-const RAIN: Array[int] = [1, 1, 1, 2, 2, 2, 5, 5, 6, 7]
+const RAIN: Array[int] = [8, 8, 8, 9, 9, 9, 10, 10, 1, 2, 5, 6, 7]
 
 
 static func roll(region: String, rng: RandomNumberGenerator, first_capture: bool = false, postgame: bool = false) -> Dictionary:
