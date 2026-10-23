@@ -7,11 +7,16 @@ const SAVE_VERSION: int = 1
 const PARTY_LIMIT: int = 6
 const HOME_POSITION: Vector3 = Vector3(-7.0, 0.0, 5.0)
 const FLAG_KEYS: Array[String] = ["starter", "rival", "gym", "captured"]
-const OPTIONAL_FLAG_KEYS: Array[String] = ["cache"]
+const TIDE_FLAG_KEYS: Array[String] = ["tide_started", "tide_rescued", "tide_rewarded", "tide_wind", "tide_water", "tide_brass"]
+const OPTIONAL_FLAG_KEYS: Array[String] = ["cache", "tide_started", "tide_rescued", "tide_rewarded", "tide_wind", "tide_water", "tide_brass"]
 
 var party: Array[Dictionary] = []
 var collection: Array[int] = []
-var flags: Dictionary = {"starter": false, "rival": false, "gym": false, "captured": false, "cache": false}
+var flags: Dictionary = {
+	"starter": false, "rival": false, "gym": false, "captured": false, "cache": false,
+	"tide_started": false, "tide_rescued": false, "tide_rewarded": false,
+	"tide_wind": false, "tide_water": false, "tide_brass": false,
+}
 var orbs: int = 12
 var tonics: int = 5
 var position: Vector3 = HOME_POSITION
@@ -136,6 +141,14 @@ func load_game(path: String = "user://lanternwake.json") -> bool:
 		return false
 	if bool(new_flags.gym) and (not bool(new_flags.rival) or not bool(new_flags.captured)):
 		return false
+	if bool(new_flags.tide_rewarded) and not bool(new_flags.tide_rescued):
+		return false
+	if bool(new_flags.tide_rescued) and not bool(new_flags.tide_started):
+		return false
+	if not bool(new_flags.starter):
+		for key: String in TIDE_FLAG_KEYS:
+			if bool(new_flags[key]):
+				return false
 	var new_collection: Array[int] = []
 	for id: Variant in data.collection:
 		if not _valid_int(id, 0, DB.SPECIES.size() - 1) or new_collection.has(int(id)):

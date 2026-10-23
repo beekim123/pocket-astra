@@ -13,6 +13,7 @@ func _initialize() -> void:
 	_check(FontArt.width("星星\n星", 2) == FontArt.width("星星", 2), "Chinese multiline width measures the widest line")
 	_test_chinese_wrap()
 	_test_language_switch()
+	_test_catalog_glyphs()
 	print("CHINESE FONT TESTS: %d checks, %d failures" % [checks, failures])
 	quit(1 if failures > 0 else 0)
 
@@ -68,3 +69,15 @@ func _check(condition: bool, message: String) -> void:
 	if not condition:
 		failures += 1
 		printerr("FAIL: ", message)
+
+func _test_catalog_glyphs() -> void:
+	var locale: GDScript = load("res://scripts/localization.gd")
+	var seen: Dictionary = {}
+	var texts: Array = locale.TEXT.values()
+	for template: Array in locale.TEMPLATES:
+		texts.append(str(template[1]))
+	for translated: String in texts:
+		for character: String in translated:
+			if character.unicode_at(0) > 127 and not seen.has(character):
+				seen[character] = true
+				_check(FontArt.has_cjk_support(character), "System font covers catalog character: " + character)

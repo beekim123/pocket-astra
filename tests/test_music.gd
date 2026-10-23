@@ -6,7 +6,7 @@ extends SceneTree
 
 const MusicSource = preload("res://scripts/music.gd")
 const THEMES: Array[String] = ["title", "village", "wild", "battle", "gym", "victory"]
-const EFFECTS: Array[String] = ["confirm", "step", "hit", "heal", "capture", "win", "lose"]
+const EFFECTS: Array[String] = ["confirm", "step", "hit", "heal", "capture", "win", "lose", "tide_wind", "tide_water", "tide_brass", "tide_song"]
 
 var checks: int = 0
 var failures: int = 0

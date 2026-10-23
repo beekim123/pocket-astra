@@ -4,6 +4,7 @@ const F = preload("res://scripts/pixel_font.gd")
 const Art = preload("res://scripts/art.gd")
 const DB = preload("res://scripts/creature_db.gd")
 const Locale = preload("res://scripts/localization.gd")
+const ShoreQuest = preload("res://scripts/tide_quest.gd")
 const INK := Color("142b34")
 const PANEL := Color(0.045, 0.10, 0.14, 0.96)
 const CREAM := Color("f1e4c5")
@@ -166,6 +167,10 @@ func _exploration(show_controls: bool = true) -> void:
 		draw_rect(Rect2(x + 5, 151, 34, 3), Color("3b514e"))
 		draw_rect(Rect2(x + 5, 151, 34 * float(c.hp) / float(c.max_hp), 3), TEAL)
 	if show_controls:
+		if bool(game.state.flags.starter):
+			_panel(Rect2(28, 562, 338, 82), TEAL, 0.90)
+			_text("OPTIONAL SHORE JOURNEY", Vector2(45, 575), 1, TEAL)
+			_paragraph(ShoreQuest.objective(game.state), Vector2(45, 599), 48, 1, CREAM, 6)
 		_panel(Rect2(28, 658, 1224, 37), MIST, 0.85)
 		_text("WASD / MOVE    SHIFT / RUN    E / TALK    TAB / SATCHEL    J / JOURNAL    F5 / SAVE", Vector2(45, 672), 1, CREAM)
 		_text("VESSELS %02d  TONICS %02d" % [game.state.orbs, game.state.tonics], Vector2(956, 672), 1, GOLD)
@@ -200,7 +205,8 @@ func _health(creature: Dictionary, pos: Vector2, enemy_side: bool = false) -> vo
 
 func _battle() -> void:
 	draw_rect(Rect2(0, 0, 1280, 8), INK)
-	_text("FIRST LIGHT TRIAL" if game.battle.kind == "gym" else ("IVO / BRIDGE CHALLENGE" if game.battle.kind == "trainer" else "A SONG IN THE REEDS"), Vector2(42, 37), 2, CREAM)
+	var wild_heading: String = "A SONG IN THE TIDEPOOLS" if game.battle_region == "tidepools" else "A SONG IN THE REEDS"
+	_text("FIRST LIGHT TRIAL" if game.battle.kind == "gym" else ("IVO / BRIDGE CHALLENGE" if game.battle.kind == "trainer" else wild_heading), Vector2(42, 37), 2, CREAM)
 	_text("TURN %02d   /   %s" % [game.battle.turn + 1, str(game.battle.kind).to_upper()], Vector2(43, 64), 1, GOLD)
 	_health(game.battle.enemy, Vector2(856, 34), true)
 	_health(game.battle.player(), Vector2(45, 425))
@@ -305,6 +311,11 @@ func _journal_menu() -> void:
 	_text("RECORDED" if known else "NOT YET BEFRIENDED", Vector2(662, 594), 1, TEAL if known else GOLD)
 
 func _map_menu() -> void:
+	_button("map_island", "ISLAND MAP", Rect2(74, 151, 155, 22), 1)
+	_button("map_shore", "SHORE MAP", Rect2(238, 151, 155, 22), 1)
+	if game.map_shore:
+		_shore_map()
+		return
 	var map_rect := Rect2(74, 174, 681, 439)
 	draw_rect(map_rect, Color("244849"))
 	# Schematic cartography built from the same world-space landmarks.
@@ -325,8 +336,10 @@ func _map_menu() -> void:
 	_text("IVO", Vector2(476, 420), 1, CREAM)
 	var p: Vector3 = game.world.player_position
 	var marker := Vector2(414 + p.x * 21, 389 + p.z * 17)
-	draw_circle(marker, 7, GOLD)
-	draw_arc(marker, 12 + sin(game.clock * 3) * 2, 0, TAU, 24, CREAM, 1)
+	if game.world.area_id() != "tidepools":
+		draw_circle(marker, 7, GOLD)
+		draw_arc(marker, 12 + sin(game.clock * 3) * 2, 0, TAU, 24, CREAM, 1)
+	_text("CAUSEWAY / SOUTH", Vector2(118, 580), 1, GOLD)
 	_text("YOUR JOURNEY", Vector2(800, 184), 2, GOLD)
 	var milestones := ["CHOOSE A COMPANION", "CATCH A WILD RESONANT", "DEFEAT IVO", "WIN THE FIRST LIGHT"]
 	var keys := ["starter", "captured", "rival", "gym"]
@@ -335,6 +348,46 @@ func _map_menu() -> void:
 		draw_circle(Vector2(810, y + 6), 5, TEAL if game.state.flags[keys[i]] else MIST)
 		_text(milestones[i], Vector2(830, y), 1, CREAM)
 	_paragraph("Paths are safe. Walk into the reeds to meet a wild resonant. Mira offers free rest and supplies in the village.", Vector2(800, 527), 32, 2, MIST)
+
+func _shore_point(point: Vector2) -> Vector2:
+	return Vector2(100 + (point.x + 13.4) * 52, 196 + (point.y - 10) * 28)
+
+func _shore_rect(rect: Rect2, color: Color) -> void:
+	draw_rect(Rect2(_shore_point(rect.position), rect.size * Vector2(52, 28)), color)
+
+func _shore_map() -> void:
+	draw_rect(Rect2(74, 178, 681, 435), Color("244849"))
+	_shore_rect(Rect2(-8.3, 10, 2.7, 3.4), Color("b4a47f"))
+	_shore_rect(Rect2(-13.4, 13, 10.8, 10.6), Color("7c918b"))
+	for pool in game.world.TIDE_POOLS:
+		_shore_rect(pool, Color("356b73"))
+	_shore_rect(game.world.TIDE_REEDS, Color("456e62"))
+	var positions: Array[Vector2] = [Vector2(-11.8, 14.3), Vector2(-12, 21.4), Vector2(-3.5, 16.2)]
+	var keys: Array[String] = ["tide_wind", "tide_water", "tide_brass"]
+	for i in range(3):
+		var p: Vector2 = _shore_point(positions[i])
+		draw_circle(p, 9, TEAL if game.state.flags.get(keys[i], false) else INK)
+		_center(str(i + 1), p - Vector2(0, 4), 1, CREAM)
+	var rescue_pos := _shore_point(Vector2(-4.5, 21.7))
+	draw_circle(rescue_pos, 11, GOLD)
+	_center("RESCUE COMPLETE" if game.state.flags.get("tide_rescued", false) else "HELP WISPIP", rescue_pos + Vector2(-7, 20), 1, INK)
+	_center("RETURN TO THE VILLAGE", Vector2(436, 208), 1, INK)
+	_text("TIDEGLASS POOLS", Vector2(106, 589), 1, CREAM)
+	if game.world.area_id() == "tidepools":
+		var player: Vector3 = game.world.player_position
+		var point := _shore_point(Vector2(player.x, player.z))
+		draw_circle(point, 5, CREAM)
+		draw_arc(point, 11 + sin(game.clock * 3) * 2, 0, TAU, 24, GOLD, 1)
+	_text("TIDEGLASS RESCUE", Vector2(800, 184), 2, GOLD)
+	_paragraph(ShoreQuest.objective(game.state), Vector2(800, 228), 32, 2, CREAM)
+	_text("SHORE NOTES %d / 3" % ShoreQuest.marker_count(game.state), Vector2(800, 332), 2, TEAL)
+	var names: Array[String] = ["WIND-HOLE STONE", "WATER CHANNEL", "BRASS CHIMES"]
+	for i in range(3):
+		var y: float = 376 + i * 43
+		draw_circle(Vector2(810, y + 6), 5, TEAL if game.state.flags.get(keys[i], false) else MIST)
+		_text("%d" % (i + 1), Vector2(827, y), 1, GOLD)
+		_text(names[i], Vector2(849, y), 1, CREAM)
+	_paragraph("Follow the dry eastern bank to Wispip. The three markers can be heard in any order.", Vector2(800, 527), 32, 2, MIST)
 
 func _settings_menu() -> void:
 	_text("A COMFORTABLE JOURNEY", Vector2(82, 185), 2, GOLD)

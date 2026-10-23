@@ -6,7 +6,10 @@ extends RefCounted
 const Locale = preload("res://scripts/localization.gd")
 const CLOSING_PUNCTUATION: String = "，。！？；：、）》】〕〉」』”’,.!?;:)]}"
 const SYSTEM_FONT_NAMES: PackedStringArray = [
-	"PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", "WenQuanYi Micro Hei"
+	# This Godot/macOS combination can resolve PingFang SC to a partial HK face.
+	# Prefer installed families with verified simplified-Chinese coverage first.
+	"Hiragino Sans GB", "Heiti SC", "Microsoft YaHei", "Noto Sans CJK SC",
+	"WenQuanYi Micro Hei", "PingFang SC"
 ]
 
 static var _system_font: SystemFont

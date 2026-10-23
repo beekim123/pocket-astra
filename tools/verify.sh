@@ -37,5 +37,9 @@ run_check music --script tests/test_music.gd
 run_check localization --script tests/test_localization.gd
 run_check chinese_font --script tests/test_chinese_font.gd
 run_check preferences --script tests/test_preferences.gd
+run_check tide_rules --script tests/test_tide_rules.gd
+run_check tide_journey --script tests/test_tide_journey.gd
+run_check tide_journey_english --script tests/test_tide_journey.gd -- en
+run_check tide_localization --script tests/test_tide_localization.gd
 run_check startup --quit-after 30
 echo "All sequential checks passed. Logs: $log_dir"

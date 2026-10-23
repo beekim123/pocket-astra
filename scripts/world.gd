@@ -3,6 +3,12 @@ extends Node3D
 ## A miniature archipelago, built exclusively from meshes and code-painted pixels.
 
 const Art = preload("res://scripts/art.gd")
+const Tidepool = preload("res://scripts/tidepool_world.gd")
+const TIDE_CAUSEWAY: Rect2 = Tidepool.CAUSEWAY
+const TIDE_BOUNDS: Rect2 = Tidepool.BOUNDS
+const TIDE_POOLS: Array[Rect2] = Tidepool.POOLS
+const TIDE_REEDS: Rect2 = Tidepool.REEDS
+const SHORE_MARGIN: float = 0.18
 var camera: Camera3D
 var player: Sprite3D
 var companion: Sprite3D
@@ -22,6 +28,10 @@ var battle_enemy: Sprite3D
 var battle_ids := Vector2i(0, 3)
 var battle_pulse: float = 0.0
 var stage: Node3D
+var tidepools: Tidepool
+var battle_biome: String = "meadow"
+var _stage_surfaces: Array[Dictionary] = []
+var _shore_stage_props: Node3D
 var _materials: Dictionary = {}
 var _rng := RandomNumberGenerator.new()
 var _last_frame: int = -1
@@ -34,6 +44,8 @@ func _ready() -> void:
 	_build_island()
 	_build_village()
 	_build_meadow()
+	tidepools = Tidepool.new()
+	tidepools.build(self)
 	_build_stage()
 	player = _person("player", player_position)
 	companion = _sprite(Art.creature(0), player_position + Vector3(0.8, 0.55, 0.6), 0.017)
@@ -369,8 +381,8 @@ func _build_stage() -> void:
 	stage = Node3D.new()
 	stage.position = Vector3(0, 0, 55)
 	add_child(stage)
-	_cylinder(Vector3(0, -0.55, 0), 10, 1, Color("5e8074"), 24, stage)
-	_cylinder(Vector3(0, 0.0, 0), 7.4, 0.2, Color("92a17f"), 24, stage)
+	_stage_surface(_cylinder(Vector3(0, -0.55, 0), 10, 1, Color("5e8074"), 24, stage), Color("395d64"))
+	_stage_surface(_cylinder(Vector3(0, 0.0, 0), 7.4, 0.2, Color("92a17f"), 24, stage), Color("81b7ad"))
 	# Worn tiles and inset rings keep the arena rooted in a physical ruin.
 	for ring in range(3):
 		for i in range(28):
@@ -378,16 +390,26 @@ func _build_stage() -> void:
 			var radius: float = 4.8 + ring * 0.55
 			var tile := _box(Vector3(cos(a) * radius, 0.13, sin(a) * radius * 0.82), Vector3(0.76, 0.04, 0.42), Color("829687").lightened(_rng.randf_range(0, 0.18)), "stone", stage)
 			tile.rotation.y = -a + PI / 2
-	_cylinder(Vector3(-3.0, 0.16, 1.6), 2.2, 0.18, Color("c0b99a"), 24, stage)
-	_cylinder(Vector3(3.0, 0.16, -1.4), 2.2, 0.18, Color("c0b99a"), 24, stage)
+			_stage_surface(tile, Color("587c80").lightened(float((i + ring) % 4) * 0.035), "stone")
+	_stage_surface(_cylinder(Vector3(-3.0, 0.16, 1.6), 2.2, 0.18, Color("c0b99a"), 24, stage), Color("d1d4b7"))
+	_stage_surface(_cylinder(Vector3(3.0, 0.16, -1.4), 2.2, 0.18, Color("c0b99a"), 24, stage), Color("d1d4b7"))
 	for i in range(12):
 		var a := float(i) * TAU / 12.0
-		_box(Vector3(cos(a) * 6, 0.24, sin(a) * 5), Vector3(0.8, 0.12, 0.6), Color("b4bb9f"), "stone", stage)
+		_stage_surface(_box(Vector3(cos(a) * 6, 0.24, sin(a) * 5), Vector3(0.8, 0.12, 0.6), Color("b4bb9f"), "stone", stage), Color("c6b77e"), "stone")
 	for x in [-6, 6]:
 		for z in [-3.8, 3.8]:
-			_cylinder(Vector3(x, 1.1, z), 0.45, 2.2, Color("9aa89a"), 8, stage)
-			_cylinder(Vector3(x, 2.3, z), 0.65, 0.25, Color("bac0a2"), 8, stage)
+			_stage_surface(_cylinder(Vector3(x, 1.1, z), 0.45, 2.2, Color("9aa89a"), 8, stage), Color("64908b"))
+			_stage_surface(_cylinder(Vector3(x, 2.3, z), 0.65, 0.25, Color("bac0a2"), 8, stage), Color("d3bd87"))
 			_lamp(Vector3(x, 2.42, z), stage)
+	_shore_stage_props = Node3D.new()
+	_shore_stage_props.name = "ShoreBoardwalk"
+	stage.add_child(_shore_stage_props)
+	for x in [-7.1, 7.1]:
+		for i in range(5):
+			_box(Vector3(x, 0.15, -1.0 + i * 0.48), Vector3(1.0, 0.18, 0.40), Color("b5a47a"), "wood", _shore_stage_props)
+		for z in [-1.1, 1.0]:
+			_box(Vector3(x, 0.35, z), Vector3(0.15, 0.60, 0.15), Color("d7ba78"), "", _shore_stage_props)
+	_shore_stage_props.visible = false
 	for i in range(8):
 		var p := Vector3(-7.5 + i * 2.1, 0.0, 49.0 - absf(3.5 - i) * 0.18)
 		_tree(p, 0.8, false)
@@ -396,13 +418,19 @@ func _build_stage() -> void:
 	battle_player.visible = false
 	battle_enemy.visible = false
 
+func _stage_surface(node: MeshInstance3D, shore_color: Color, texture_kind: String = "") -> void:
+	_stage_surfaces.append({"node":node, "meadow":node.material_override, "tidepools":_mat(shore_color, texture_kind)})
+
 func can_walk(pos: Vector3) -> bool:
-	if absf(pos.x) > 14.5 or absf(pos.z) > 10.6:
+	var point := Vector2(pos.x, pos.z)
+	var original_island: bool = absf(pos.x) <= 14.5 and absf(pos.z) <= 10.6
+	var tide_shore: bool = TIDE_CAUSEWAY.grow(-SHORE_MARGIN).has_point(point) or TIDE_BOUNDS.grow(-SHORE_MARGIN).has_point(point)
+	if not original_island and not tide_shore:
 		return false
 	if absf(pos.x) < 1.9 and (pos.z < 3.25 or pos.z > 4.95):
 		return false
 	for rect in obstacles:
-		if rect.grow(0.18).has_point(Vector2(pos.x, pos.z)):
+		if rect.grow(SHORE_MARGIN).has_point(point):
 			return false
 	return true
 
@@ -429,6 +457,8 @@ func nearby() -> Dictionary:
 	var nearest: Dictionary = {}
 	var distance: float = 1.7
 	for npc in npcs:
+		if not bool(npc.get("active", true)):
+			continue
 		var d: float = player_position.distance_to(npc.pos)
 		if d < distance:
 			distance = d
@@ -436,17 +466,42 @@ func nearby() -> Dictionary:
 	return nearest
 
 func is_grass() -> bool:
-	return player_position.x > 3.6 and player_position.z > -1.8 and player_position.z < 8.5 and absf(player_position.z - 4.1) > 1.12 and absf(player_position.x - 9) > 1.3
+	return encounter_region() != ""
+
+func encounter_region() -> String:
+	if Tidepool.is_encounter_point(player_position):
+		return "tidepools"
+	if player_position.x > 3.6 and player_position.z > -1.8 and player_position.z < 8.5 and absf(player_position.z - 4.1) > 1.12 and absf(player_position.x - 9) > 1.3:
+		return "meadow"
+	return ""
+
+func area_id() -> String:
+	var point := Vector2(player_position.x, player_position.z)
+	if TIDE_BOUNDS.has_point(point) or (player_position.z > 10.6 and TIDE_CAUSEWAY.has_point(point)):
+		return "tidepools"
+	if player_position.x < 0:
+		return "village"
+	if player_position.z < -3.8:
+		return "sanctum"
+	return "meadow"
 
 func area_name() -> String:
-	if player_position.x < 0:
-		return "WAKEHARBOR"
-	if player_position.z < -3.8:
-		return "FIRST LIGHT SANCTUM"
+	match area_id():
+		"village": return "WAKEHARBOR"
+		"sanctum": return "FIRST LIGHT SANCTUM"
+		"tidepools": return "TIDEGLASS POOLS"
 	return "CANDLE REED MEADOW"
 
-func set_battle(enabled: bool, player_id: int = 0, enemy_id: int = 3) -> void:
+func sync_tide_progress(flags: Dictionary) -> void:
+	tidepools.sync_progress(flags)
+
+func set_battle(enabled: bool, player_id: int = 0, enemy_id: int = 3, biome: String = "meadow") -> void:
 	in_battle = enabled
+	battle_biome = "tidepools" if biome == "tidepools" else "meadow"
+	for surface in _stage_surfaces:
+		var node: MeshInstance3D = surface.node
+		node.material_override = surface[battle_biome]
+	_shore_stage_props.visible = battle_biome == "tidepools"
 	battle_ids = Vector2i(player_id, enemy_id)
 	battle_player.visible = enabled
 	battle_enemy.visible = enabled
@@ -477,7 +532,8 @@ func _process(delta: float) -> void:
 	companion.visible = companion_id >= 0 and not in_battle
 	companion.position = companion.position.lerp(player_position + Vector3(0.65, 0.6 + sin(clock * 3) * 0.04, 0.65), minf(1, delta * 4))
 	if not in_battle:
-		var target := Vector3(clampf(player_position.x, -9, 9), 0, clampf(player_position.z, -6, 6))
+		var south_limit: float = 21.0 if area_id() == "tidepools" else 6.0
+		var target := Vector3(clampf(player_position.x, -9, 9), 0, clampf(player_position.z, -6, south_limit))
 		_camera_target = _camera_target.lerp(target, 1.0 - exp(-delta * 3.5))
 		camera.position = _camera_target + Vector3(0, 17, 20)
 		camera.look_at(_camera_target)

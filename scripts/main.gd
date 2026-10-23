@@ -9,6 +9,8 @@ const UI = preload("res://scripts/game_ui.gd")
 const Music = preload("res://scripts/music.gd")
 const Locale = preload("res://scripts/localization.gd")
 const Preferences = preload("res://scripts/preferences.gd")
+const ShoreQuest = preload("res://scripts/tide_quest.gd")
+const Encounters = preload("res://scripts/encounter_tables.gd")
 
 var state: GameState = State.new()
 var world: LanternWorld
@@ -18,6 +20,8 @@ var battle: Battle
 var mode: String = "title"
 var menu_tab: String = "party"
 var menu_return: String = "explore"
+var map_shore: bool = false
+var battle_region: String = "meadow"
 var selection: int = 0
 var chosen_creature: int = 0
 var journal_id: int = 0
@@ -77,6 +81,7 @@ func _ready() -> void:
 	has_save = saved.load_game()
 	if has_save:
 		state = saved
+	world.sync_tide_progress(state.flags)
 	music.set_theme("title")
 	get_tree().auto_accept_quit = false
 
@@ -116,8 +121,8 @@ func _process(delta: float) -> void:
 		if area != area_text:
 			area_text = area
 			area_timer = 3.3
-			music.set_theme("village" if world.player_position.x < 0 else "wild")
-		if bool(state.flags.starter) and world.is_grass() and encounter_cooldown <= 0:
+			music.set_theme("village" if world.area_id() == "village" else "wild")
+		if bool(state.flags.starter) and world.encounter_region() != "" and encounter_cooldown <= 0:
 			encounter_distance += traveled
 			if encounter_distance >= encounter_target:
 				encounter_distance = 0
@@ -231,6 +236,8 @@ func handle_action(action: String) -> void:
 		return
 	if action.begins_with("tab:"):
 		menu_tab = action.get_slice(":", 1)
+		if menu_tab == "map":
+			map_shore = world.area_id() == "tidepools"
 		release_pending = false
 		selection = ["party", "journal", "map", "settings"].find(menu_tab)
 		return
@@ -242,6 +249,8 @@ func handle_action(action: String) -> void:
 		journal_id = int(action.get_slice(":", 1))
 		return
 	match action:
+		"map_shore": map_shore = true
+		"map_island": map_shore = false
 		"language":
 			Locale.set_language("en" if Locale.chinese() else "zh_CN")
 			preferences.language = Locale.language
@@ -262,9 +271,10 @@ func handle_action(action: String) -> void:
 		"continue":
 			world.player_position = state.position if world.can_walk(state.position) else State.HOME_POSITION
 			world.companion_id = int(state.active().id) if not state.active().is_empty() else -1
+			world.sync_tide_progress(state.flags)
 			mode = "explore"
 			selection = 0
-			music.set_theme("village")
+			music.set_theme("village" if world.area_id() == "village" else "wild")
 			area_timer = 3.0
 		"interact": interact()
 		"next": _advance_dialogue()
@@ -319,6 +329,7 @@ func _new_game() -> void:
 	state = State.new()
 	world.player_position = State.HOME_POSITION
 	world.companion_id = -1
+	world.sync_tide_progress(state.flags)
 	selection = 0
 	encounter_distance = 0
 	area_timer = 3.0
@@ -369,6 +380,15 @@ func interact() -> void:
 	if npc.is_empty():
 		notify("WALK TO A PERSON OR SIGN, THEN PRESS E.")
 		return
+	if str(npc.role).begins_with("tide_"):
+		var event: Dictionary = ShoreQuest.interact(state, str(npc.role))
+		if bool(event.changed):
+			world.sync_tide_progress(state.flags)
+			_save(false)
+		music.sfx(str(event.sound))
+		encounter_cooldown = 2.0
+		say(str(event.speaker), event.lines)
+		return
 	match str(npc.role):
 		"mentor":
 			say(npc.name, ["The lighthouse is no place for a lonely hero. Catch a friend in Candle Reed, meet Ivo at the bridge, and listen to what Soren has to say.", "EMBER warms GROVE. GROVE drinks TIDE. TIDE cools EMBER. A plain Strike is useful when your own element is resisted."])
@@ -406,23 +426,19 @@ func interact() -> void:
 				say(npc.name, ["You found 4 echo vessels and 2 tonics! A note reads: 'For whoever chooses the longer road.'"])
 
 func _wild_encounter() -> void:
-	var id: int = 3
-	var level: int = 3
-	if bool(state.flags.captured):
-		var table := [3, 4, 5, 3, 4, 5, 0, 1, 2, 6, 7]
-		id = table[rng.randi_range(0, table.size() - 1)]
-		level = rng.randi_range(3, 5) + (1 if bool(state.flags.gym) else 0)
-	start_battle("wild", [DB.make_creature(id, level)])
+	var encounter: Dictionary = Encounters.roll(world.area_id(), rng, not bool(state.flags.captured), bool(state.flags.gym))
+	start_battle("wild", [DB.make_creature(int(encounter.id), int(encounter.level))])
 
 func start_battle(kind: String, enemies: Array[Dictionary]) -> void:
 	battle = Rules.new()
+	battle_region = world.area_id()
 	battle.begin(state, kind, enemies)
 	mode = "battle"
 	selection = 1
 	battle_lines.clear()
 	battle_queue.assign(battle.log)
 	battle_timer = 0
-	world.set_battle(true, int(battle.player().id), int(battle.enemy.id))
+	world.set_battle(true, int(battle.player().id), int(battle.enemy.id), battle_region)
 	music.set_theme("gym" if kind == "gym" else "battle")
 
 func _perform(action: String, index: int = 0) -> void:
@@ -467,7 +483,7 @@ func _finish_battle() -> void:
 		world.player_position = state.position
 	world.companion_id = int(state.active().id)
 	_save(false)
-	music.set_theme("village" if world.player_position.x < 0 else "wild")
+	music.set_theme("village" if world.area_id() == "village" else "wild")
 	if battle.kind == "gym" and battle.outcome == "won":
 		music.set_theme("victory")
 		say("SOREN / THE FIRST LIGHT", [
@@ -484,6 +500,7 @@ func _open_menu(tab: String) -> void:
 	menu_return = mode
 	mode = "menu"
 	menu_tab = tab
+	map_shore = world.area_id() == "tidepools"
 	selection = ["party", "journal", "map", "settings"].find(tab)
 	chosen_creature = 0
 	release_pending = false

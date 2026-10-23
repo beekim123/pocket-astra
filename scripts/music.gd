@@ -260,6 +260,22 @@ func sfx(kind: String) -> void:
 			_effect_note(69, 0.0, 0.23, "flute", 0.070)
 			_effect_note(65, 0.19, 0.25, "flute", 0.065)
 			_effect_note(62, 0.41, 0.42, "flute", 0.060)
+		"tide_wind":
+			# The shore objects answer fragments of the original lantern call.
+			_effect_note(74, 0.0, 0.23, "flute", 0.060, -0.25)
+			_effect_note(69, 0.19, 0.28, "flute", 0.055, 0.25)
+		"tide_water":
+			_effect_note(74, 0.0, 0.14, "sine", 0.068, -0.15)
+			_effect_note(76, 0.13, 0.23, "sine", 0.062, 0.15)
+		"tide_brass":
+			_effect_note(78, 0.0, 0.17, "pluck", 0.065, 0.20)
+			_effect_note(76, 0.15, 0.26, "pluck", 0.060, -0.20)
+		"tide_song":
+			# D5-A4-D5-F#5: four notes fit the existing four-voice effect pool.
+			_effect_note(74, 0.0, 0.16, "flute", 0.065, -0.20)
+			_effect_note(69, 0.16, 0.12, "pluck", 0.060, 0.20)
+			_effect_note(74, 0.28, 0.14, "flute", 0.065, -0.10)
+			_effect_note(78, 0.42, 0.30, "pluck", 0.065, 0.10)
 
 
 func _apply_theme(theme: String) -> void:
