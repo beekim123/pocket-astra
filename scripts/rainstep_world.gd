@@ -1,6 +1,6 @@
 extends RefCounted
 ## A second island with a flat navigation shelf and layered, hand-built waterworks.
-## The village is built once; restoring progress only swaps local water materials.
+## The village is built once; restoring progress only swaps local visual states.
 
 const BOUNDS := Rect2(48, -11, 24, 22)
 const DOCK := Vector3(60, 0, 8)
@@ -12,6 +12,9 @@ const MARKERS: Array[Dictionary] = [
 ]
 const KEEPER_POSITION := Vector3(56, 0, 5.5)
 const FERRY_POSITION := Vector3(60, 0, 9.4)
+const NERI_POSITION := Vector3(63.5, 0, -6.5)
+const ILYA_POSITION := Vector3(60, 0, -8.6)
+const BEACON_POSITION := Vector3(60, 0, -9.7)
 const SHORE_MARGIN: float = 0.18
 
 var root_node: Node3D
@@ -19,6 +22,9 @@ var obstacles: Array[Rect2] = []
 var channel_water: Dictionary = {}
 var marker_gems: Dictionary = {}
 var marker_lights: Dictionary = {}
+var beacon_light: OmniLight3D
+var beacon_flame: MeshInstance3D
+var _trial_badge: MeshInstance3D
 var _still_material: StandardMaterial3D
 var _flow_materials: Dictionary = {}
 var _world
@@ -33,9 +39,11 @@ func build(world: Node3D) -> void:
 	_build_paths()
 	_build_cottages()
 	_build_channels()
+	_build_beacon()
 	_build_plants()
 	_build_ferries()
 	_build_keeper()
+	_build_challengers()
 	_build_lights()
 	sync_progress({})
 
@@ -153,10 +161,55 @@ func _build_channels() -> void:
 		obstacles.append(Rect2(61.05, z - 0.38, 9.65, 0.76))
 		_bridge(Vector3(60, 0, z))
 		_build_marker(marker)
-	# A small cascade at the rear gives the channels a visible source.
+	# The old cascade becomes the beacon's collection basin; its footprint stays fixed.
 	_box(Vector3(60, 0.38, -9.9), Vector3(2.2, 0.7, 0.8), Color("69778d"), "stone")
 	_box(Vector3(60, 0.77, -9.9), Vector3(1.75, 0.09, 0.65), Color("9bc8d5"))
 	obstacles.append(Rect2(58.8, -10.4, 2.4, 1.0))
+
+
+func _build_beacon() -> void:
+	# Flush wet-stone rings are walkable; only the existing cascade blocks movement.
+	for ring in range(2):
+		for i in range(12):
+			var angle: float = i * TAU / 12.0
+			var radius: float = 0.79 + ring * 0.29
+			var slab := _box(BEACON_POSITION + Vector3(cos(angle) * radius, 0.085, sin(angle) * radius), Vector3(0.32 + ring * 0.11, 0.055, 0.13), Color("a0adbb") if i % 2 else Color("71859b"), "stone")
+			slab.rotation.y = -angle + PI / 2
+	# A narrow six-sided rain collector fits inside the original basin collision.
+	_cylinder(BEACON_POSITION + Vector3(0, 1.9, 0), 0.43, 2.7, Color("a6b4bd"), 6)
+	for y in [0.7, 1.45, 2.2, 2.95]:
+		_cylinder(BEACON_POSITION + Vector3(0, y, 0), 0.46, 0.13, Color("7786a0"), 6)
+	for side in [-1, 1]:
+		_box(BEACON_POSITION + Vector3(side * 0.31, 1.88, 0.20), Vector3(0.075, 2.55, 0.075), Color("b49a80"))
+		for i in range(5):
+			var louver := _box(BEACON_POSITION + Vector3(side * 0.25, 1.08 + i * 0.32, 0.35), Vector3(0.30, 0.055, 0.14), Color("6c7c91"))
+			louver.rotation.x = -0.27
+	_cylinder(BEACON_POSITION + Vector3(0, 3.25, 0), 0.78, 0.18, Color("7d8cab"), 6)
+	_cylinder(BEACON_POSITION + Vector3(0, 3.35, 0), 0.66, 0.055, Color("a6c2cc"), 6)
+	for i in range(6):
+		var angle: float = i * TAU / 6.0
+		_box(BEACON_POSITION + Vector3(cos(angle) * 0.59, 3.8, sin(angle) * 0.59), Vector3(0.085, 1.0, 0.085), Color("b59a81"))
+	beacon_flame = _world._sphere(BEACON_POSITION + Vector3(0, 3.78, 0), 0.30, Color("596773"), root_node)
+	_cylinder(BEACON_POSITION + Vector3(0, 4.28, 0), 0.78, 0.16, Color("8e95b7"), 6)
+	var roof := CylinderMesh.new()
+	roof.top_radius = 0.14
+	roof.bottom_radius = 0.91
+	roof.height = 0.70
+	roof.radial_segments = 6
+	var roof_node := MeshInstance3D.new()
+	roof_node.mesh = roof
+	roof_node.material_override = _world._mat(Color("7f89b0"), "roof")
+	roof_node.position = BEACON_POSITION + Vector3(0, 4.66, 0)
+	root_node.add_child(roof_node)
+	_cylinder(BEACON_POSITION + Vector3(0, 5.07, 0), 0.17, 0.14, Color("cabba8"), 6)
+	beacon_light = OmniLight3D.new()
+	beacon_light.position = BEACON_POSITION + Vector3(0, 3.78, 0)
+	beacon_light.light_color = Color("ffe4c3")
+	beacon_light.light_energy = 0.8
+	beacon_light.omni_range = 7.5
+	root_node.add_child(beacon_light)
+	# Reuse the world's existing lamp pulse; progress changes remain event-driven.
+	_world.lamps.append(beacon_light)
 
 
 func _bridge(pos: Vector3) -> void:
@@ -257,6 +310,22 @@ func _build_keeper() -> void:
 		_box(Vector3(54.5 + i * 0.25, 0.59, 6.25), Vector3(0.14, 0.06, 0.50), Color("d2b893"))
 
 
+func _build_challengers() -> void:
+	var neri: Sprite3D = _world._person("rival", NERI_POSITION)
+	neri.modulate = Color("e7c28e")
+	neri.reparent(root_node)
+	_world.npcs.append({"role":"challenge_rain_trial", "name":"NERI / CHANNEL CHALLENGER", "pos":NERI_POSITION, "sprite":neri, "island":"rainstep"})
+	var ilya: Sprite3D = _world._person("keeper", ILYA_POSITION)
+	ilya.modulate = Color("cfbee5")
+	ilya.reparent(root_node)
+	_world.npcs.append({"role":"challenge_second_light", "name":"ILYA / SECOND LIGHT KEEPER", "pos":ILYA_POSITION, "sprite":ilya, "island":"rainstep"})
+	# A small badge beside Neri records the channel trial without obstructing the road.
+	var post_position := NERI_POSITION + Vector3(0.65, 0, -0.35)
+	_box(post_position + Vector3(0, 0.32, 0), Vector3(0.10, 0.64, 0.10), Color("7a8497"))
+	_trial_badge = _box(post_position + Vector3(0, 0.68, 0), Vector3(0.24, 0.24, 0.12), Color("8b8290"))
+	_trial_badge.rotation.z = PI / 4
+
+
 func _build_lights() -> void:
 	for pos in [Vector3(58.2, 0, 8.2), Vector3(61.7, 0, 4.1), Vector3(58.2, 0, -1.2), Vector3(61.7, 0, -6.3), Vector3(54.6, 0, 4.7)]:
 		_world._lamp(pos, root_node)
@@ -278,6 +347,10 @@ func sync_progress(flags: Dictionary) -> void:
 		gem.material_override = _world._mat(Color("a9dcea"), "", 0.85) if active else _world._mat(Color("8b8290"))
 		var light: OmniLight3D = marker_lights[marker.role]
 		light.visible = active
+	var awakened: bool = bool(flags.get("rain_gym", false))
+	beacon_light.visible = awakened
+	beacon_flame.material_override = _world._mat(Color("ffe4c3"), "", 2.2) if awakened else _world._mat(Color("596773"))
+	_trial_badge.material_override = _world._mat(Color("cde8f0"), "", 0.85) if bool(flags.get("rain_trial", false)) else _world._mat(Color("8b8290"))
 
 
 func can_walk(pos: Vector3) -> bool:

@@ -13,6 +13,7 @@ const ShoreQuest = preload("res://scripts/tide_quest.gd")
 const Encounters = preload("res://scripts/encounter_tables.gd")
 const RainStory = preload("res://scripts/rain_quest.gd")
 const Journal = preload("res://scripts/field_journal.gd")
+const Challenges = preload("res://scripts/challenge_db.gd")
 
 var state: GameState = State.new()
 var world: LanternWorld
@@ -20,6 +21,7 @@ var hud: Control
 var music: ProceduralMusic
 var battle: Battle
 var mode: String = "title"
+var ending_chapter: int = 1
 var menu_tab: String = "party"
 var menu_return: String = "explore"
 var map_shore: bool = false
@@ -357,12 +359,13 @@ func handle_action(action: String) -> void:
 		"ending_continue":
 			mode = "explore"
 			music.set_theme("wild")
-			notify("THE FIRST LIGHT IS YOURS. THE MEADOW IS STILL ALIVE.")
+			notify("TWO LIGHTS ARE YOURS. RAINSTEP IS ALIVE WITH SONG." if ending_chapter == 2 else "THE FIRST LIGHT IS YOURS. THE MEADOW IS STILL ALIVE.")
 		"quit":
 			_request_quit()
 
 func _new_game() -> void:
 	state = State.new()
+	ending_chapter = 1
 	journal_id = 0
 	journal_page = 0
 	world.set_island("wakeharbor", State.HOME_POSITION)
@@ -427,6 +430,22 @@ func interact() -> void:
 		var invitation: String = "The First Light has opened the sea-lane. My ferry can take you to Rainstep, where the roof gutters have fallen quiet." if ferry_destination == "rainstep" else "The ferry is ready whenever you want to return to Wakeharbor."
 		say(npc.name, [invitation], func(): mode = "ferry"; selection = 0)
 		return
+	if str(npc.role) == "challenge_rain_trial":
+		if bool(state.flags.rain_trial):
+			say(npc.name, ["Your companions know how to listen to each other. Ilya is waiting at the beacon at the end of the northern path."])
+		elif not bool(state.flags.rain_rewarded):
+			say(npc.name, ["First help the water find its way through all three channels, then report to Orla. A shared light begins with work that helps someone else."])
+		else:
+			say(npc.name, ["The channels are singing again. Let us see how your companions answer one another. I will rest your team before we begin.", "My Rillisk moves quickly; my Terracurl stands firm. A plain Strike is useful when an element is resisted."], func(): start_challenge("rain_trial"))
+		return
+	if str(npc.role) == "challenge_second_light":
+		if bool(state.flags.rain_gym):
+			_show_second_ending()
+		elif not bool(state.flags.rain_trial):
+			say(npc.name, ["This beacon asks for two things: bring the rain back to the gardens, and learn to listen in Neri's channel challenge.", "Report the waterworks to Orla, then meet Neri on the northern crossing. I will be here when you are ready."])
+		else:
+			say(npc.name, ["A light carried alone is a spark. A light shared across the sea becomes a promise.", "Your team may rest here. Face my Terracurl, Rillisk, and Glimveil; use your whole party, and take time to recover when you need it."], func(): start_challenge("second_light"))
+		return
 	if str(npc.role).begins_with("rain_"):
 		var event: Dictionary = RainStory.interact(state, str(npc.role))
 		if str(npc.role) == "rain_keeper":
@@ -463,14 +482,14 @@ func interact() -> void:
 			elif not bool(state.flags.captured):
 				say(npc.name, ["Catch one wild resonant first! Step into the reeds beside this path. Weaken it with Strike, then throw an echo vessel."])
 			else:
-				say(npc.name, ["Two sparks already? Then let's see how they move together. I'll give your team a quick rest before we begin."], func(): state.heal_all(); start_battle("trainer", [DB.make_creature(4, 4), DB.make_creature(5, 5)]))
+				say(npc.name, ["Two sparks already? Then let's see how they move together. I'll give your team a quick rest before we begin."], func(): start_challenge("harbor_ivo"))
 		"keeper":
 			if bool(state.flags.gym):
 				say(npc.name, ["Look beyond the mist. That is a sea-lane, shining again. The First Light crest belongs to you.", "The world holds %d kinds of resonants now. Your field journal remembers every friendship, even after a release." % DB.SPECIES.size()])
 			elif not bool(state.flags.captured) or not bool(state.flags.rival):
 				say(npc.name, ["The First Light trial asks for trust and practice. Befriend one wild resonant, then earn Ivo's respect at the bridge.", "Return with those two experiences, and we will wake this tower together."])
 			else:
-				say(npc.name, ["The first light is not a flame. It is the choice to care for something smaller than yourself.", "Your companions may rest here. When you are ready, face my Voltkite and Noctulume. Let us hear your song."], func(): state.heal_all(); start_battle("gym", [DB.make_creature(6, 6), DB.make_creature(7, 7)]))
+				say(npc.name, ["The first light is not a flame. It is the choice to care for something smaller than yourself.", "Your companions may rest here. When you are ready, face my Voltkite and Noctulume. Let us hear your song."], func(): start_challenge("first_light"))
 		"sign":
 			say(npc.name, ["CANDLE REED FIELD NOTES: Wild resonants hide away from the stone paths. Their outlines stir where the grass grows tall.", "Capture is certain at one-quarter health; your very first catch needs only half health. Strike is gentler than a signature move.", "P opens your party. J opens the journal. Set a new lead to train another friend. A full party can release a companion while keeping its journal entry."])
 		"cache":
@@ -510,13 +529,28 @@ func start_battle(kind: String, enemies: Array[Dictionary]) -> void:
 	battle = Rules.new()
 	battle_region = world.area_id()
 	battle.begin(state, kind, enemies)
+	_open_battle_view()
+
+func start_challenge(id: String) -> void:
+	if not Challenges.can_start(state, id):
+		notify("Complete the current trial requirements first.")
+		return
+	state.heal_all()
+	var next_battle := Rules.new()
+	if not next_battle.begin_challenge(state, id):
+		return
+	battle = next_battle
+	battle_region = "beacon" if id == "second_light" else world.area_id()
+	_open_battle_view()
+
+func _open_battle_view() -> void:
 	mode = "battle"
 	selection = 1
 	battle_lines.clear()
 	battle_queue.assign(battle.log)
 	battle_timer = 0
 	world.set_battle(true, int(battle.player().id), int(battle.enemy.id), battle_region)
-	music.set_theme("gym" if kind == "gym" else "battle")
+	music.set_theme("gym" if battle.kind == "gym" else "battle")
 
 func _perform(action: String, index: int = 0) -> void:
 	if mode != "battle" or not battle_queue.is_empty() or battle_timer > 0 or battle.finished:
@@ -559,9 +593,15 @@ func _finish_battle() -> void:
 	if battle.outcome == "lost":
 		world.set_island(state.island_id, state.position)
 	world.companion_id = int(state.active().id)
+	world.sync_rain_progress(state.flags)
 	_save(false)
 	music.set_theme("village" if world.area_id() == "village" else "wild")
-	if battle.kind == "gym" and battle.outcome == "won":
+	if battle.challenge_id == "second_light" and battle.outcome == "won":
+		_show_second_ending()
+	elif battle.challenge_id == "rain_trial" and battle.outcome == "won":
+		say("NERI", ["You gave every voice its moment. Take these supplies, and follow the central path north to Ilya's beacon.", "The Second Light trial has three companions. Switch when a matchup is difficult, and let Orla help whenever you need a rest."])
+	elif battle.kind == "gym" and battle.outcome == "won":
+		ending_chapter = 1
 		music.set_theme("victory")
 		say("SOREN / THE FIRST LIGHT", [
 			"There it is. Not the loudest song, but one that knows when to listen. The tower remembers.",
@@ -587,6 +627,21 @@ func _open_menu(tab: String) -> void:
 	release_pending = false
 	journal_id = clampi(journal_id, 0, DB.SPECIES.size() - 1)
 	journal_page = floori(float(journal_id) / Journal.PAGE_SIZE)
+
+func _show_second_ending() -> void:
+	ending_chapter = 2
+	music.set_theme("victory")
+	say("ILYA / SECOND LIGHT KEEPER", [
+		"Listen. The water below and the light above are answering each other. Rainstep has found its voice again.",
+		"Take the Second Light crest. Tonight, our beacon and Wakeharbor's lamp will draw a path across the mist.",
+		"Two islands, two lights, and all the small companions who carried us here. Let the next traveller find a brighter shore.",
+	], func(): mode = "ending"; selection = 0)
+
+func objective_text() -> String:
+	var challenge_goal: String = Challenges.objective(state)
+	if not challenge_goal.is_empty():
+		return challenge_goal
+	return RainStory.objective(state) if bool(state.flags.gym) else state.quest()
 
 func journal_visible_ids() -> Array[int]:
 	return Journal.ids_on_page(journal_page, DB.SPECIES.size())

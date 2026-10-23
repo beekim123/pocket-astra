@@ -12,7 +12,7 @@ const FLAG_KEYS: Array[String] = ["starter", "rival", "gym", "captured"]
 const TIDE_FLAG_KEYS: Array[String] = ["tide_started", "tide_rescued", "tide_rewarded", "tide_wind", "tide_water", "tide_brass"]
 const RAIN_FLAG_KEYS: Array[String] = ["rain_arrived", "rain_started", "rain_upper", "rain_middle", "rain_lower", "rain_rewarded"]
 const RAIN_REPAIR_KEYS: Array[String] = ["rain_upper", "rain_middle", "rain_lower"]
-const OPTIONAL_FLAG_KEYS: Array[String] = ["cache", "tide_started", "tide_rescued", "tide_rewarded", "tide_wind", "tide_water", "tide_brass", "rain_arrived", "rain_started", "rain_upper", "rain_middle", "rain_lower", "rain_rewarded"]
+const OPTIONAL_FLAG_KEYS: Array[String] = ["cache", "tide_started", "tide_rescued", "tide_rewarded", "tide_wind", "tide_water", "tide_brass", "rain_arrived", "rain_started", "rain_upper", "rain_middle", "rain_lower", "rain_rewarded", "rain_trial", "rain_gym"]
 
 var party: Array[Dictionary] = []
 var collection: Array[int] = []
@@ -22,6 +22,7 @@ var flags: Dictionary = {
 	"tide_wind": false, "tide_water": false, "tide_brass": false,
 	"rain_arrived": false, "rain_started": false, "rain_upper": false,
 	"rain_middle": false, "rain_lower": false, "rain_rewarded": false,
+	"rain_trial": false, "rain_gym": false,
 }
 var orbs: int = 12
 var tonics: int = 5
@@ -179,6 +180,10 @@ func load_game(path: String = "user://lanternwake.json") -> bool:
 			return false
 		if bool(new_flags.rain_rewarded) and not bool(new_flags[key]):
 			return false
+	if bool(new_flags.rain_trial) and not bool(new_flags.rain_rewarded):
+		return false
+	if bool(new_flags.rain_gym) and not bool(new_flags.rain_trial):
+		return false
 	var new_collection: Array[int] = []
 	for id: Variant in data.collection:
 		if not _valid_int(id, 0, DB.SPECIES.size() - 1) or new_collection.has(int(id)):

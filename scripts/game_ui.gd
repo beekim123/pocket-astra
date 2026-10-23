@@ -6,6 +6,7 @@ const DB = preload("res://scripts/creature_db.gd")
 const Locale = preload("res://scripts/localization.gd")
 const ShoreQuest = preload("res://scripts/tide_quest.gd")
 const RainStory = preload("res://scripts/rain_quest.gd")
+const Challenges = preload("res://scripts/challenge_db.gd")
 const INK := Color("142b34")
 const PANEL := Color(0.045, 0.10, 0.14, 0.96)
 const CREAM := Color("f1e4c5")
@@ -113,8 +114,8 @@ func _title() -> void:
 	else:
 		_text("LANTERN", Vector2(68, 206), 9, CREAM)
 		_text("WAKE", Vector2(68, 283), 9, CREAM)
-	_text("CHAPTER I  /  THE FIRST LIGHT", Vector2(74, 378), 2, GOLD)
-	_text("A SMALL ISLAND. A SONG IN THE REEDS.", Vector2(74, 419), 2, MIST)
+	_text("TWO ISLANDS  /  TWO LIGHTS", Vector2(74, 378), 2, GOLD)
+	_text("TWO SMALL ISLANDS. SONGS ACROSS THE SEA.", Vector2(74, 419), 2, MIST)
 	_text("A LIGHT TO GUIDE YOU HOME.", Vector2(74, 446), 2, MIST)
 	var y: float = 523
 	if game.has_save:
@@ -158,12 +159,11 @@ func _starters() -> void:
 
 func _exploration(show_controls: bool = true) -> void:
 	_panel(Rect2(28, 24, 338, 61), GOLD, 0.91)
-	_text("THE FIRST LIGHT  /  CHAPTER I", Vector2(46, 35), 1, GOLD)
+	_text("THE SECOND LIGHT / CHAPTER II" if game.world.island_id == "rainstep" else "THE FIRST LIGHT  /  CHAPTER I", Vector2(46, 35), 1, GOLD)
 	_text(game.world.area_name(), Vector2(46, 55), 2)
 	_panel(Rect2(790, 24, 462, 92), MIST, 0.91)
 	_text("YOUR NEXT STEP", Vector2(811, 39), 1, GOLD)
-	var objective: String = RainStory.objective(game.state) if bool(game.state.flags.gym) else game.state.quest()
-	_paragraph(objective, Vector2(811, 59), 35, 2, CREAM, 7)
+	_paragraph(game.objective_text(), Vector2(811, 59), 35, 2, CREAM, 7)
 	for i in range(game.state.party.size()):
 		var c: Dictionary = game.state.party[i]
 		var x: float = 32 + i * 51
@@ -223,7 +223,10 @@ func _health(creature: Dictionary, pos: Vector2, enemy_side: bool = false) -> vo
 func _battle() -> void:
 	draw_rect(Rect2(0, 0, 1280, 8), INK)
 	var wild_heading: String = "A SONG IN THE TIDEPOOLS" if game.battle_region == "tidepools" else ("A SONG IN THE RAIN" if game.battle_region == "rainstep" else "A SONG IN THE REEDS")
-	_text("FIRST LIGHT TRIAL" if game.battle.kind == "gym" else ("IVO / BRIDGE CHALLENGE" if game.battle.kind == "trainer" else wild_heading), Vector2(42, 37), 2, CREAM)
+	var title: String = "FIRST LIGHT TRIAL" if game.battle.kind == "gym" else ("IVO / BRIDGE CHALLENGE" if game.battle.kind == "trainer" else wild_heading)
+	if not game.battle.challenge_id.is_empty():
+		title = str(Challenges.data(game.battle.challenge_id).title)
+	_text(title, Vector2(42, 37), 2, CREAM)
 	_text("TURN %02d   /   %s" % [game.battle.turn + 1, str(game.battle.kind).to_upper()], Vector2(43, 64), 1, GOLD)
 	_health(game.battle.enemy, Vector2(856, 34), true)
 	_health(game.battle.player(), Vector2(45, 425))
@@ -269,7 +272,9 @@ func _menu() -> void:
 	draw_rect(Rect2(0, 0, 1280, 720), Color(0.025, 0.07, 0.10, 0.88))
 	_panel(Rect2(40, 30, 1200, 660), GOLD)
 	_text("THE WAYFARER'S SATCHEL", Vector2(70, 56), 3)
-	_text("FIRST LIGHT CREST" if bool(game.state.flags.gym) else "ONE SMALL LIGHT AT A TIME", Vector2(774, 63), 1, GOLD)
+	var crest: String = "SECOND LIGHT CREST" if bool(game.state.flags.rain_gym) else ("FIRST LIGHT CREST" if bool(game.state.flags.gym) else "ONE SMALL LIGHT AT A TIME")
+	_text(crest, Vector2(774, 63), 1, GOLD)
+	_text("LIGHTS AWAKENED %d / 2" % (int(game.state.flags.gym) + int(game.state.flags.rain_gym)), Vector2(1020, 63), 1, TEAL)
 	var tabs := ["party", "journal", "map", "settings"]
 	for i in range(4):
 		_button("tab:" + tabs[i], tabs[i].to_upper(), Rect2(70 + i * 185, 103, 173, 38), 2)
@@ -456,7 +461,7 @@ func _rain_map() -> void:
 		draw_arc(marker, 12, 0, TAU, 32, GOLD, 1)
 	_text("RAINSTEP TERRACES", Vector2(106, 592), 1, CREAM)
 	_text("RAINSTEP WATERWORKS", Vector2(800, 184), 2, GOLD)
-	_paragraph(RainStory.objective(game.state), Vector2(800, 228), 32, 2, CREAM)
+	_paragraph(game.objective_text(), Vector2(800, 228), 32, 2, CREAM)
 	_text("WATER CHANNELS %d / 3" % RainStory.repaired_count(game.state), Vector2(800, 332), 2, TEAL)
 	var names: Array[String] = ["ROOF INTAKE", "BRIDGE JUNCTION", "GARDEN OUTLET"]
 	for i in range(3):
@@ -464,7 +469,19 @@ func _rain_map() -> void:
 		draw_circle(Vector2(810, y + 6), 5, TEAL if game.state.flags.get(keys[i], false) else MIST)
 		_text(str(i + 1), Vector2(827, y), 1, GOLD)
 		_text(names[i], Vector2(849, y), 1, CREAM)
-	_paragraph("Three channels carry roof water to the gardens. Repair them in any order, then return to Orla.", Vector2(800, 527), 32, 2, MIST)
+	if bool(game.state.flags.rain_rewarded):
+		for entry in [["rain_trial", "DEFEAT NERI"], ["rain_gym", "WIN THE SECOND LIGHT"]]:
+			var y: float = 523 if entry[0] == "rain_trial" else 560
+			draw_circle(Vector2(810, y + 6), 5, TEAL if game.state.flags[entry[0]] else MIST)
+			_text(entry[1], Vector2(830, y), 1, CREAM)
+	else:
+		_paragraph("Three channels carry roof water to the gardens. Repair them in any order, then return to Orla.", Vector2(800, 527), 32, 2, MIST)
+	var neri: Vector2 = _rain_point(Vector2(63.5, -6.5))
+	draw_circle(neri, 6, GOLD)
+	_text("NERI", neri + Vector2(9, -3), 1, INK)
+	var beacon: Vector2 = _rain_point(Vector2(60, -8.6))
+	draw_circle(beacon, 7, TEAL if game.state.flags.rain_gym else GOLD)
+	_text("SECOND LIGHT BEACON", beacon + Vector2(12, -3), 1, CREAM)
 
 func _settings_menu() -> void:
 	_text("A COMFORTABLE JOURNEY", Vector2(82, 185), 2, GOLD)
@@ -481,13 +498,19 @@ func _settings_menu() -> void:
 
 func _ending() -> void:
 	draw_rect(Rect2(0, 0, 1280, 720), Color(0.025, 0.08, 0.10, 0.9))
-	_crest(Vector2(640, 155), 75)
-	_center("THE FIRST LIGHT", Vector2(640, 270), 5, CREAM)
-	_center("A SEA-LANE SHINES AGAIN.", Vector2(640, 332), 2, GOLD)
-	_center("A SMALL JOURNEY. A REAL DIFFERENCE.", Vector2(640, 382), 2, MIST)
+	var second: bool = game.ending_chapter == 2
+	if second:
+		_crest(Vector2(565, 155), 56, GOLD)
+		_crest(Vector2(715, 155), 56, TEAL)
+		draw_line(Vector2(621, 155), Vector2(659, 155), GOLD, 1)
+	else:
+		_crest(Vector2(640, 155), 75)
+	_center("THE SECOND LIGHT" if second else "THE FIRST LIGHT", Vector2(640, 270), 5, CREAM)
+	_center("TWO SEA-LANES SHINE AGAIN." if second else "A SEA-LANE SHINES AGAIN.", Vector2(640, 332), 2, GOLD)
+	_center("TWO LIGHTS, ONE SHARED HORIZON." if second else "A SMALL JOURNEY. A REAL DIFFERENCE.", Vector2(640, 382), 2, MIST)
 	for i in range(game.state.party.size()):
 		var x: float = 640 - game.state.party.size() * 45 + i * 90
 		draw_texture_rect(Art.creature(int(game.state.party[i].id), int(game.clock * 2) % 3), Rect2(x, 425, 90, 90), false)
 	_center("%d FRIENDSHIPS RECORDED  /  %d MINUTES UNDER THE LANTERNS" % [game.state.collection.size(), int(game.state.play_seconds) / 60], Vector2(640, 541), 1, GOLD)
 	_button("ending_continue", "RETURN TO THE ISLAND", Rect2(430, 590, 420, 50), 2)
-	_center("LANTERNWAKE  /  END OF CHAPTER I", Vector2(640, 676), 1, MIST)
+	_center("LANTERNWAKE / END OF CHAPTER II" if second else "LANTERNWAKE  /  END OF CHAPTER I", Vector2(640, 676), 1, MIST)

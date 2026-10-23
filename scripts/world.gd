@@ -40,6 +40,7 @@ var battle_biome: String = "meadow"
 var _stage_surfaces: Array[Dictionary] = []
 var _shore_stage_props: Node3D
 var _rain_stage_props: Node3D
+var _beacon_stage_props: Node3D
 var _materials: Dictionary = {}
 var _rng := RandomNumberGenerator.new()
 var _last_frame: int = -1
@@ -431,6 +432,21 @@ func _build_stage() -> void:
 			_box(Vector3(x, 0.47, z), Vector3(1.5, 0.12, 0.12), Color("af997f"), "wood", _rain_stage_props)
 		_box(Vector3(x, 0.30, 0), Vector3(0.16, 0.08, 2.8), Color("87cbd7"), "", _rain_stage_props)
 	_rain_stage_props.visible = false
+	_beacon_stage_props = Node3D.new()
+	_beacon_stage_props.name = "SecondBeaconCourt"
+	stage.add_child(_beacon_stage_props)
+	# Copper inlays echo the collector's six-sided roof around a cool wet-stone court.
+	for i in range(24):
+		var angle: float = i * TAU / 24.0
+		var inlay := _box(Vector3(cos(angle) * 6.55, 0.24, sin(angle) * 5.48), Vector3(0.65, 0.055, 0.11), Color("cfac84"), "", _beacon_stage_props)
+		inlay.rotation.y = -angle + PI / 2
+	for x in [-5.5, 5.5]:
+		for z in [-3.2, 3.2]:
+			_cylinder(Vector3(x, 0.48, z), 0.34, 0.72, Color("7e8ea7"), 6, _beacon_stage_props)
+			_cylinder(Vector3(x, 0.88, z), 0.52, 0.13, Color("b6a7c8"), 6, _beacon_stage_props)
+			var cap := _sphere(Vector3(x, 1.07, z), 0.14, Color("ffe4c3"), _beacon_stage_props)
+			cap.material_override = _mat(Color("ffe4c3"), "", 1.1)
+	_beacon_stage_props.visible = false
 	for i in range(8):
 		var p := Vector3(-7.5 + i * 2.1, 0.0, 49.0 - absf(3.5 - i) * 0.18)
 		_tree(p, 0.8, false)
@@ -441,7 +457,8 @@ func _build_stage() -> void:
 
 func _stage_surface(node: MeshInstance3D, shore_color: Color, texture_kind: String = "") -> void:
 	var rain_color: Color = shore_color.lerp(Color("777ba2"), 0.52)
-	_stage_surfaces.append({"node":node, "meadow":node.material_override, "tidepools":_mat(shore_color, texture_kind), "rainstep":_mat(rain_color, texture_kind)})
+	var beacon_color: Color = shore_color.lerp(Color("8a9dbc"), 0.60)
+	_stage_surfaces.append({"node":node, "meadow":node.material_override, "tidepools":_mat(shore_color, texture_kind), "rainstep":_mat(rain_color, texture_kind), "beacon":_mat(beacon_color, texture_kind)})
 
 func set_island(id: String, spawn: Vector3) -> void:
 	island_id = id if id in ["wakeharbor", "rainstep"] else "wakeharbor"
@@ -555,12 +572,13 @@ func sync_rain_progress(flags: Dictionary) -> void:
 
 func set_battle(enabled: bool, player_id: int = 0, enemy_id: int = 3, biome: String = "meadow") -> void:
 	in_battle = enabled
-	battle_biome = biome if biome in ["tidepools", "rainstep"] else "meadow"
+	battle_biome = biome if biome in ["tidepools", "rainstep", "beacon"] else "meadow"
 	for surface in _stage_surfaces:
 		var node: MeshInstance3D = surface.node
 		node.material_override = surface[battle_biome]
 	_shore_stage_props.visible = battle_biome == "tidepools"
-	_rain_stage_props.visible = battle_biome == "rainstep"
+	_rain_stage_props.visible = battle_biome in ["rainstep", "beacon"]
+	_beacon_stage_props.visible = battle_biome == "beacon"
 	battle_ids = Vector2i(player_id, enemy_id)
 	battle_player.visible = enabled
 	battle_enemy.visible = enabled

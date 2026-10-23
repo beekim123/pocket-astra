@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="灯潮纪 / Lanternwake — The First Light"
+config/name="灯潮纪 / Lanternwake"
 config/description="An original code-crafted creature RPG. Explore, befriend, and rekindle the lighthouse."
 run/main_scene="res://scenes/main.tscn"
 config/use_custom_user_dir=true

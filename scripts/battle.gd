@@ -3,12 +3,14 @@ extends RefCounted
 ## Seedable turn resolver. UI consumes event strings; no scene nodes are required.
 
 const DB = preload("res://scripts/creature_db.gd")
+const CHALLENGES = preload("res://scripts/challenge_db.gd")
 const STRIKE_POWER: int = 12
 
 var state: GameState
 var enemies: Array[Dictionary] = []
 var enemy: Dictionary = {}
 var kind: String = "wild"
+var challenge_id: String = ""
 var active_index: int = 0
 var finished: bool = false
 var outcome: String = ""
@@ -23,6 +25,7 @@ var _events: Array[String] = []
 func begin(game: GameState, battle_kind: String, opponents: Array[Dictionary], seed_value: int = -1) -> void:
 	state = game
 	kind = battle_kind
+	challenge_id = ""
 	enemies.clear()
 	enemy = {}
 	log.clear()
@@ -59,6 +62,29 @@ func begin(game: GameState, battle_kind: String, opponents: Array[Dictionary], s
 	else:
 		_say("Ivo sends out %s!" % _name(enemy))
 	_say("Go, %s!" % _name(player()))
+
+
+func begin_challenge(game: GameState, id: String, seed_value: int = -1) -> bool:
+	var challenge: Dictionary = CHALLENGES.data(id)
+	if not CHALLENGES.can_start(game, id):
+		# Reset any earlier battle before showing the refusal; input must stay inert.
+		begin(game, "trainer", [], seed_value)
+		log.clear()
+		_events.clear()
+		if game != null and not challenge.is_empty() and bool(game.flags.get(str(challenge.flag), false)):
+			_say("This challenge is already complete.")
+		else:
+			_say("This challenge is not available yet. Check your route and milestones.")
+		return false
+	begin(game, str(challenge.kind), CHALLENGES.opponents(id), seed_value)
+	if finished:
+		return false
+	challenge_id = id
+	log.clear()
+	_events.clear()
+	_say(str(challenge.opening) % _name(enemy))
+	_say("Go, %s!" % _name(player()))
+	return true
 
 
 func player() -> Dictionary:
@@ -253,6 +279,9 @@ func _award_xp(amount: int) -> void:
 func _win() -> void:
 	finished = true
 	outcome = "won"
+	if not challenge_id.is_empty():
+		_win_challenge()
+		return
 	if kind == "gym":
 		state.flags.gym = true
 		state.orbs = mini(999, state.orbs + 6)
@@ -267,6 +296,22 @@ func _win() -> void:
 	else:
 		state.orbs = mini(999, state.orbs + 1)
 		_say("Victory! You found a spare capture orb.")
+
+
+func _win_challenge() -> void:
+	var challenge: Dictionary = CHALLENGES.data(challenge_id)
+	var flag: String = str(challenge.flag)
+	if bool(state.flags.get(flag, false)):
+		_say("This challenge is already complete.")
+		return
+	state.flags[flag] = true
+	var added_orbs: int = mini(int(challenge.reward_orbs), 999 - state.orbs)
+	var added_tonics: int = mini(int(challenge.reward_tonics), 999 - state.tonics)
+	state.orbs += added_orbs
+	state.tonics += added_tonics
+	for line: String in challenge.victory_lines:
+		_say(line)
+	_say("%s gives you %d orbs and %d tonics." % [str(challenge.trainer), added_orbs, added_tonics])
 
 
 func _lose() -> void:

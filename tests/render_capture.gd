@@ -68,6 +68,32 @@ func _run() -> void:
 			game.battle_lines.assign(game.battle.log)
 			game.battle_timer = 0
 		"settings": game._open_menu("settings")
+		"second_beacon", "second_unlit", "second_map", "neri_battle", "second_battle", "second_ending":
+			game.state.choose_starter(0)
+			game.state.party[0] = DB.make_creature(0, 8)
+			game.state.add_creature(8, 7)
+			game.state.add_creature(10, 7)
+			for key: String in ["captured", "rival", "gym", "rain_arrived", "rain_started", "rain_upper", "rain_middle", "rain_lower", "rain_rewarded"]:
+				game.state.flags[key] = true
+			game.state.flags.rain_trial = view != "neri_battle"
+			game.state.flags.rain_gym = view in ["second_beacon", "second_ending"]
+			game.state.island_id = "rainstep"
+			game.world.set_island("rainstep", Vector3(60, 0, -7.2))
+			game.world.companion_id = 0
+			game.world.sync_rain_progress(game.state.flags)
+			game.mode = "explore"
+			game.area_text = "RAINSTEP TERRACES"
+			game.encounter_cooldown = 99
+			if view == "second_map":
+				game._open_menu("map")
+			elif view in ["neri_battle", "second_battle"]:
+				game.start_challenge("rain_trial" if view == "neri_battle" else "second_light")
+				game.battle_queue.clear()
+				game.battle_lines.assign(game.battle.log)
+				game.battle_timer = 0
+			elif view == "second_ending":
+				game.ending_chapter = 2
+				game.mode = "ending"
 		"rainstep", "rain_map", "rain_repair", "rain_battle", "ferry":
 			game.state.choose_starter(2)
 			game.state.flags.captured = true
